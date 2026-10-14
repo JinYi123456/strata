@@ -1,0 +1,24 @@
+# STRATA vision core — pinned dependencies
+#
+# The vision core targets OpenCV 5 specifically. The rewritten graph DNN engine,
+# the neural feature module (ALIKED / DISK / LightGlue), the USAC robust
+# estimation framework and the point-cloud module are all OpenCV 5 APIs.
+#
+# Pinned to the versions this project was built and tested against.
+opencv-contrib-python==5.0.0.93
+numpy==2.5.4
+scipy==1.18.1
+pillow==12.3.0
+
+# --- Service layer ---
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+pydantic==2.14.1
+httpx==0.28.1
+
+# --- AWS ---
+boto3==1.43.112
+
+# --- Test ---
+pytest==9.0.1
