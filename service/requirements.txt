@@ -1,0 +1,15 @@
+# STRATA service — pinned to the versions this was built and tested against.
+#
+# The vision core is imported from ../vision, so its dependencies are declared
+# there. This file adds only what the HTTP layer needs.
+#
+#   pip install -r vision/requirements.txt -r service/requirements.txt
+
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+pydantic==2.13.1
+python-multipart==0.0.20
+
+# Test client. httpx is also used by the optional model-backed decision layer,
+# which is why it is not marked as a dev dependency.
+httpx==0.28.1
