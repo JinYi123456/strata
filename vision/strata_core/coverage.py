@@ -66,6 +66,10 @@ class CoverageMap:
     observed_fraction: float = 0.0
     status: str = "unknown"          # observed | weak | unobserved
     frame_count: int = 0
+    # The canonical frame this grid covers. Carried explicitly so a consumer can
+    # map a point in canonical pixels onto a cell without assuming a size - the
+    # grid is resolution-independent, but the coordinates fed into it are not.
+    canonical_size: tuple[int, int] = (1600, 1200)
 
     def heatmap(self, size: tuple[int, int] | None = None) -> np.ndarray:
         """Render the coverage score as a BGR heatmap at canonical size."""
@@ -121,6 +125,7 @@ class CoverageMap:
             "observed_fraction": round(float(self.observed_fraction), 4),
             "status": self.status,
             "frame_count": int(self.frame_count),
+            "canonical_size": [int(self.canonical_size[0]), int(self.canonical_size[1])],
             "keypoint_counts": self.keypoint_counts.astype(int).tolist(),
             "texture_energy": np.round(self.texture_energy, 3).tolist(),
         }
@@ -208,6 +213,7 @@ class CoverageAccumulator:
             keypoint_counts=self.keypoint_counts,
             texture_energy=np.clip(texture, 0.0, 1.0),
             frame_count=self.frame_count,
+            canonical_size=self.canonical_size,
         )
         cmap.observed_fraction = self._observed_fraction(cmap)
         cmap.status = _status_for(cmap.observed_fraction, self.cfg)
@@ -305,6 +311,18 @@ def _direction_for(
     if dr < 0:
         return "tilt up", f"upper cell ({r},{c}) is under-observed"
     return "tilt down", f"lower cell ({r},{c}) is under-observed"
+
+
+def direction_to_cell(cmap: CoverageMap, cell: tuple[int, int]) -> tuple[str, str]:
+    """Directional guidance for one specific cell.
+
+    The same mapping :func:`view_requests` uses, exposed for callers that already
+    know which cell they care about - the agent aiming a capture at an unresolved
+    change, for instance, rather than at the worst-covered area in general.
+    """
+    rows, cols = cmap.rows, cmap.cols
+    r, c = int(cell[0]), int(cell[1])
+    return _direction_for(r, c, (rows - 1) / 2.0, (cols - 1) / 2.0, rows, cols)
 
 
 def coverage_summary(cmap: CoverageMap, requests: list[ViewRequest]) -> dict:

@@ -64,6 +64,15 @@ class GeometryConfig:
     # owns the full residual-gating thresholds.
     residual_good_px: float = 2.5
     residual_poor_px: float = 6.0
+    # Ceiling on confidence for a registration whose correspondences came from a
+    # pair with almost no structure to match (see ``features._structure_verdict``).
+    # Such a pair can still yield a geometrically consistent match set that has
+    # nothing to do with reality, so the alignment must not be reported as
+    # trustworthy. Placed deliberately just above the agent's abort threshold:
+    # a thin pair is never silently trusted, but it is also never discarded
+    # outright - the agent gets to see that the alignment is weak and ask for a
+    # better view, which is the whole point of the loop.
+    low_structure_confidence_cap: float = 0.34
 
 
 @dataclass(frozen=True)

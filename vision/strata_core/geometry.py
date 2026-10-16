@@ -142,10 +142,10 @@ def register(
     canonical_size = canonical_size_for(dst_shape, cfg.canonical_long_edge)
 
     if len(matches) < cfg.min_inliers:
-        return _identity_registration(
-            canonical_size,
-            f"only {len(matches)} putative matches (< {cfg.min_inliers})",
-        )
+        reason = f"only {len(matches)} putative matches (< {cfg.min_inliers})"
+        if getattr(matches, "low_structure", False):
+            reason += "; the pair has almost no structure to match"
+        return _identity_registration(canonical_size, reason)
 
     src = matches.src_points.astype(np.float64)
     dst = matches.dst_points.astype(np.float64)
@@ -239,6 +239,19 @@ def register(
 
     inlier_ratio = float(inliers.sum()) / float(len(src))
     confidence = _confidence(inlier_ratio, err, int(inliers.sum()), cfg)
+    if getattr(matches, "low_structure", False):
+        # The correspondences came from a pair with almost no structure, where a
+        # consistent-looking match set can be pure coincidence. Whatever the
+        # geometric quality metrics say, this alignment has not been earned, so
+        # it is capped rather than trusted.
+        if confidence > cfg.low_structure_confidence_cap:
+            note.append(
+                f"low-structure pair: confidence capped at "
+                f"{cfg.low_structure_confidence_cap:.2f} (was {confidence:.2f})"
+            )
+            confidence = cfg.low_structure_confidence_cap
+        else:
+            note.append("low-structure pair: alignment is not trustworthy")
 
     residual = None
     if model == "homography":
