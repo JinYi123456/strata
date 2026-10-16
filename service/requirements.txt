@@ -1,15 +1,14 @@
-# STRATA service — pinned to the versions this was built and tested against.
+# STRATA service — pinned to the versions this project was built against.
 #
-# The vision core is imported from ../vision, so its dependencies are declared
-# there. This file adds only what the HTTP layer needs.
+# Three packages, because the service is a thin HTTP layer and nothing more.
+# Notably absent, and deliberately:
 #
-#   pip install -r vision/requirements.txt -r service/requirements.txt
-
+#   * python-multipart — uploads are JSON with base64 payloads, not form posts,
+#     so the multipart parser is never imported.
+#   * any database driver — storage is the filesystem or S3 + DynamoDB, behind
+#     one interface in service/store.py.
+#   * httpx — needed only by the test client and by the optional model-backed
+#     decision layer, both of which are declared in requirements-dev.txt.
 fastapi==0.121.2
 uvicorn[standard]==0.41.0
 pydantic==2.13.1
-python-multipart==0.0.20
-
-# Test client. httpx is also used by the optional model-backed decision layer,
-# which is why it is not marked as a dev dependency.
-httpx==0.28.1

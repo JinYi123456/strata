@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The mark: three strata in section, the deepest one faded. -->
+  <rect width="32" height="32" rx="7" fill="#080B0F"/>
+  <g fill="none" stroke="#4FE3C1" stroke-width="1.7" stroke-linejoin="round">
+    <path d="M5 11.5 16 6l11 5.5L16 17z"/>
+    <path d="M5 17.5 16 23l11-5.5"/>
+    <path d="M5 22.5 16 28l11-5.5" stroke-opacity="0.45"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+# Optional extras, plus everything needed to run the test suite.
+#
+#   pip install -r requirements-dev.txt
+#   pytest
+#
+# Neither optional package is required for the product to work:
+#
+#   * httpx      — used by the optional model-backed decision layer, and by the
+#                  FastAPI test client. Without it, the agent uses the
+#                  deterministic rule policy, which is the default anyway, and
+#                  the service tests cannot run.
+#   * boto3      — used only when STRATA_EXECUTOR=aws, for S3 and DynamoDB.
+#                  Without it, the filesystem store is used.
+
+-r requirements.txt
+
+httpx==0.28.1
+boto3==1.43.112
+pytest==9.1.1

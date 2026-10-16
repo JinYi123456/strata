@@ -57,29 +57,40 @@ record a site  ──►  re-scan it later  ──►  review the change set  �
 
 ## Quick start
 
-Requires Python 3.11+ and, for the web app, Node 20+.
+Requires Python 3.11+.
 
 ```bash
-# 1. Python environment
+# 1. Environment
 python -m venv .venv
 .venv/Scripts/activate          # Windows
 # source .venv/bin/activate     # macOS / Linux
-pip install -r vision/requirements.txt -r service/requirements.txt
+pip install -r requirements.txt
 
-# 2. Model weights (ALIKED + LightGlue, ~50 MB)
+# 2. Model weights (optional, ~52 MB, digest-verified)
 python scripts/fetch_models.py
 
-# 3. Build the web app
-cd web && npm install && npm run build && cd ..
-
-# 4. Run it
+# 3. Run it
 python scripts/serve.py
 # → http://127.0.0.1:8000
 ```
 
+That is the whole setup. The service bundles a prebuilt console, so no Node
+toolchain is needed to run it — the interface is served from `service/static/`
+alongside the API on one port. To rebuild the console after changing anything
+under `web/`, run `bash scripts/build_console.sh`.
+
 The app opens on a set of sample sites that need nothing uploaded, so the whole
 pipeline is exercisable in one click. Sites you record yourself go through exactly
 the same code path.
+
+### For development
+
+```bash
+pip install -r requirements-dev.txt   # adds the test client and boto3
+pytest                                # fast unit tests
+pytest -m slow                        # end-to-end pipeline, agent and service
+bash scripts/verify_ui.sh             # drives the live app in a real browser
+```
 
 ### Without the model weights
 
@@ -183,44 +194,46 @@ because a benchmark of only successes measures the benchmark:
 
 ## Deployment
 
-The service serves the built web app from the same origin as the API, so there is
+The service serves the built console from the same origin as the API, so there is
 one artefact and one URL rather than two that have to be kept in step.
 
 ```bash
-STRATA_STATIC_DIR=web/out python scripts/serve.py --host 0.0.0.0 --port 8000
+PORT=8000 python scripts/serve.py
 ```
+
+With `PORT` set, the service binds `0.0.0.0` automatically — a service bound to
+loopback is unreachable from outside its own container, which is a silent and
+total failure on any hosting platform.
 
 Configuration is environment-only:
 
 | Variable | Purpose |
 |---|---|
+| `PORT` / `STRATA_PORT` | Port to listen on |
+| `STRATA_HOST` | Bind address (default: `0.0.0.0` when `PORT` is set, else loopback) |
 | `STRATA_EXECUTOR` | `local` (default) or `aws` |
 | `STRATA_DATA_DIR` | Where the local store writes |
 | `STRATA_S3_BUCKET` / `STRATA_DDB_TABLE` / `STRATA_AWS_REGION` | Managed storage |
 | `STRATA_CORS_ORIGINS` | Allowed origins |
-| `STRATA_STATIC_DIR` | Built web app to serve |
+| `STRATA_STATIC_DIR` | Built console to serve |
 
 Switching from local disk to S3 + DynamoDB is a configuration change, not a code
 change: `service/store.py` defines one interface with two implementations.
 
----
-
-## Repository layout
+### Repository layout
 
 ```
 vision/
   strata_core/       the pipeline: features, geometry, diff, events, coverage
   strata_agent/      the perception loop: policy, actions, trace, brain
   models/            ONNX weights (fetched, not committed)
-service/             the HTTP API and session lifecycle
-web/                 the operator console (TypeScript, Next.js, Tailwind)
-scripts/             evaluation, model fetch, serving, verification
-tests/               300+ tests, fast by default, `-m slow` for end-to-end
+service/             the HTTP API, session lifecycle, and the bundled console
+web/                 the console source (TypeScript, Next.js, Tailwind)
+scripts/             evaluation, model fetch, serving, console build, verification
+tests/               350+ tests, fast by default, `-m slow` for end-to-end
 ```
 
----
-
-## Tests
+### Tests
 
 ```bash
 pytest                      # fast unit tests
@@ -230,9 +243,9 @@ bash scripts/verify_ui.sh   # drives the live app in a real browser
 
 The slow tests are separated because they run the real pipeline on real frames,
 which takes minutes rather than seconds. They are also where the defects that only
-appear end to end get caught — three of them were found this way in the service
-alone, including a response that returned a 500 for exactly the case that most
-needs to work.
+appear end to end get caught — four of them were found this way, including a
+response that returned a 500 for exactly the case that most needs to work, and a
+crash that would have taken the whole service process down.
 
 ---
 

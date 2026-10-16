@@ -1,0 +1,12 @@
+# Runtime dependencies. Everything needed to run the service and the pipeline.
+#
+#   pip install -r requirements.txt
+#   python scripts/fetch_models.py     # optional: the neural feature weights
+#   python scripts/serve.py
+#
+# The pipeline is fully functional with only these installed. The two extras in
+# requirements-dev.txt are genuinely optional at runtime, and the code paths that
+# use them import them lazily and degrade rather than failing.
+
+-r vision/requirements.txt
+-r service/requirements.txt

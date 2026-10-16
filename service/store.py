@@ -151,7 +151,8 @@ class S3Store:
             import boto3  # noqa: PLC0415 - deliberate lazy import
         except ImportError as exc:  # pragma: no cover - depends on deployment
             raise StoreError(
-                "the s3 store requires boto3; install service/requirements-aws.txt"
+                "the s3 store requires boto3; install it with "
+                "'pip install -r requirements-dev.txt'"
             ) from exc
         self._boto3 = boto3
         self.bucket = bucket
