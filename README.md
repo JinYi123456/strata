@@ -92,6 +92,18 @@ pytest -m slow                        # end-to-end pipeline, agent and service
 bash scripts/verify_ui.sh             # drives the live app in a real browser
 ```
 
+### Reproducing the numbers exactly
+
+`requirements.txt` declares ranges, so the project installs on a wider range of
+interpreters. To reproduce the evaluation figures exactly, install the set they
+were measured on:
+
+```bash
+pip install -r requirements.lock
+```
+
+That is the environment the table above came from, on Python 3.13.12.
+
 ### Without the model weights
 
 The feature backend is pluggable. If the ONNX weights are absent, the pipeline

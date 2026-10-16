@@ -1,14 +1,16 @@
-# STRATA vision core — pinned to the versions this project was built against.
+# STRATA vision core — runtime dependencies.
 #
 # The core targets OpenCV 5 specifically. The rewritten graph DNN engine, the
 # neural feature module (ALIKED / DISK / LightGlue) and the USAC robust
-# estimation framework are all OpenCV 5 APIs and have no equivalent in 4.x.
+# estimation framework are all OpenCV 5 APIs and have no equivalent in 4.x:
 #
 #   python -c "import cv2; print(cv2.__version__, hasattr(cv2,'ALIKED_create'))"
 #   → 5.0.0 True
 #
-# numpy is the only other runtime dependency. There is deliberately no imaging
-# library here beyond OpenCV, no numerical toolkit, and no web framework: the
-# core is arrays in, arrays out.
+# OpenCV is pinned exactly because the API surface is the whole point. numpy is a
+# range because OpenCV already constrains it to >=2 and the exact patch release is
+# not something this project depends on - pinning it exactly would refuse to
+# install on perfectly good interpreters for no benefit. The exact set this
+# project was measured on is in ../requirements.lock.
 opencv-contrib-python==5.0.0.93
-numpy==2.5.4
+numpy>=2.0,<3

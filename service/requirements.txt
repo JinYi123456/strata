@@ -1,6 +1,6 @@
-# STRATA service — pinned to the versions this project was built against.
+# STRATA service — runtime dependencies.
 #
-# Three packages, because the service is a thin HTTP layer and nothing more.
+# The service is a thin HTTP layer, so this is three packages and nothing more.
 # Notably absent, and deliberately:
 #
 #   * python-multipart — uploads are JSON with base64 payloads, not form posts,
@@ -8,7 +8,12 @@
 #   * any database driver — storage is the filesystem or S3 + DynamoDB, behind
 #     one interface in service/store.py.
 #   * httpx — needed only by the test client and by the optional model-backed
-#     decision layer, both of which are declared in requirements-dev.txt.
-fastapi==0.121.2
-uvicorn[standard]==0.41.0
-pydantic==2.13.1
+#     decision layer, both of which are declared in ../requirements-dev.txt.
+#
+# Ranges rather than exact pins: these are stable, well-tested libraries whose
+# minor releases do not change the API this service uses, and pinning them
+# exactly only serves to refuse installation on interpreters that would work
+# fine. requirements.lock records the exact set the project was measured on.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic>=2.9,<3

@@ -1,0 +1,28 @@
+# The exact environment this project was built, tested and measured on.
+#
+#   pip install -r requirements.lock
+#
+# The ranges in requirements.txt are what you install to run the project; this
+# file exists so that a number quoted in the README or the evaluation section can
+# be reproduced exactly rather than approximately. Every figure in the evaluation
+# table came from this set, on Python 3.13.12, and the full suite passes on it.
+#
+# It is not a generated lock file - there are no transitive pins here, only the
+# direct dependencies. That is deliberate: the dependency tree is small enough to
+# read, and a generated lock would be one more artefact to keep in step.
+
+# --- vision core ---
+opencv-contrib-python==5.0.0.93
+numpy==2.5.4
+
+# --- service ---
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+pydantic==2.13.1
+
+# --- optional ---
+httpx==0.28.1
+boto3==1.43.112
+
+# --- test ---
+pytest==9.1.1
