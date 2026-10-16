@@ -56,3 +56,7 @@ build/
 aws-sam/
 samconfig.toml
 .aws-sam/
+
+# --- Deployment tracking (local tooling state, not part of the product) ---
+.wbapp_*.genie
+.workbuddy/
