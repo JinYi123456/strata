@@ -37,45 +37,14 @@ from strata_core.evaluate import (  # noqa: E402
     score_regions,
 )
 from strata_core.pipeline import run_scan  # noqa: E402
-from strata_core.synth import make_scene, make_still_pair  # noqa: E402
+from strata_core.synth import (  # noqa: E402
+    canonical_size_for_scene,
+    ground_truth_in_canonical,
+    make_scene,
+    make_still_pair,
+)
 
 log = logging.getLogger("strata.eval")
-
-
-def _scene_to_canonical_box(
-    bbox, src_size: tuple[int, int], canonical_size: tuple[int, int]
-) -> tuple[float, float, float, float]:
-    """Scale a box from scene pixels into canonical pixels.
-
-    Ground truth is expressed in the scene's own coordinates because that is
-    where the mutations were applied. Detections are reported in canonical
-    coordinates because that is where the comparison happens. Scoring one
-    against the other without a conversion compares numbers in different units
-    and yields a score near zero no matter how good the detector is - which is
-    exactly the trap this function exists to close.
-    """
-    x, y, w, h = (float(v) for v in bbox)
-    sw, sh = src_size
-    cw, ch = canonical_size
-    sx, sy = cw / float(sw), ch / float(sh)
-    return (x * sx, y * sy, w * sx, h * sy)
-
-
-def _rescan_to_canonical_box(
-    bbox, scene, canonical_size: tuple[int, int]
-) -> tuple[float, float, float, float]:
-    """Map a rescan-space box into canonical pixels.
-
-    Canonical space is the baseline's frame, so a box recorded in the rescan is
-    brought across by the same similarity the pipeline recovered - scale, then
-    translation. Using the *estimated* transform rather than the known one keeps
-    the expected box subject to the same registration error the detector faces.
-    """
-    x, y, w, h = (float(v) for v in bbox)
-    src_w, src_h = scene.size
-    cw, ch = canonical_size
-    sx, sy = cw / float(src_w), ch / float(src_h)
-    return (x * sx, y * sy, w * sx, h * sy)
 
 
 def _expected_boxes(
@@ -83,39 +52,28 @@ def _expected_boxes(
     src_size: tuple[int, int],
     canonical_size: tuple[int, int],
 ) -> list[tuple[float, float, float, float]]:
-    """Ground-truth boxes in canonical pixels, honouring each entry's own space.
+    """Ground-truth boxes in canonical pixels, via the core's own conversion.
 
-    Most events describe something that changed where the baseline recorded it,
-    so their box is a baseline-space box. An insertion has no baseline presence
-    at all - the only location it ever occupied is the one it appears at in the
-    rescan - so its box is a *rescan*-space box. Scaling one as if it were the
-    other puts the expected box in the wrong place, and the detector is then
-    scored as having missed a change it reported correctly.
+    This deliberately delegates rather than converting locally. The conversion
+    had to exist in one place: an earlier version of the service's answer-key
+    panel re-derived it, got it wrong, and reported that a system which had found
+    every change had found none. Two implementations of a coordinate transform
+    is one too many.
 
-    A translation's *destination* is deliberately excluded. The generator
-    enumerates it as its own expected location, on the reasoning that a
-    destination is a real change and a detector reporting it should not be
-    penalised. That reasoning is sound for a detector that reports the two
-    halves separately, but this system reports a translation as a single
-    ``moved`` event, and there is no second event to fill a second expected
-    location. Keeping it in the expected set therefore asks one event to
-    satisfy two boxes: the destination sits in the set unclaimed, recall is
-    capped below 1.0 by construction, and the cap is the same on every case
-    regardless of detector quality. ``scripts/oracle.py`` measures that cap -
-    an exactly-correct detector scores 0.800 recall against the unfiltered set
-    and 1.000 against the set used here.
+    The ``src_size`` and ``canonical_size`` arguments are still accepted because
+    callers hold them, but they are checked against the core's own computation
+    rather than used to re-derive anything.
     """
-    out = []
-    for gt in scene.ground_truth_events():
-        if gt["kind"] == "moved_destination":
-            continue
-        space = gt.get("bbox_space", "baseline")
-        out.append(
-            _scene_to_canonical_box(gt["baseline_bbox"], src_size, canonical_size)
-            if space == "baseline"
-            else _rescan_to_canonical_box(gt["baseline_bbox"], scene, canonical_size)
+    boxes = ground_truth_in_canonical(scene, long_edge=canonical_size[0])
+    expected_canonical = canonical_size_for_scene(scene, canonical_size[0])
+    if tuple(expected_canonical) != tuple(canonical_size):  # pragma: no cover - guard
+        raise AssertionError(
+            f"canonical size mismatch: caller passed {canonical_size}, "
+            f"core computes {expected_canonical}"
         )
-    return out
+    return [
+        (b["bbox"][0], b["bbox"][1], b["bbox"][2], b["bbox"][3]) for b in boxes
+    ]
 
 
 def run_case(
@@ -134,7 +92,6 @@ def run_case(
     result = run_scan([scene.baseline], [scene.rescan], config=cfg)
 
     canonical_size = result.diff.canonical_size
-    expected = scene.ground_truth_events()
     truth_boxes = _expected_boxes(scene, size, canonical_size)
     reported_boxes = [e.bbox for e in result.events]
 
@@ -147,10 +104,13 @@ def run_case(
     # This is the same set the region scorer uses, deliberately - the two
     # scores must be measured against one description of the truth, or they
     # disagree about how many events a correct detector reports.
-    primary = [g for g in expected if g["kind"] != "moved_destination"]
+    #
+    # `ground_truth_in_canonical` already excludes destinations and already
+    # returns canonical pixels, so this is the same set as `truth_boxes`, with
+    # the object identity kept for the per-event detail.
     primary_scaled = [
-        {**g, "baseline_bbox": list(_scene_to_canonical_box(g["baseline_bbox"], size, canonical_size))}
-        for g in primary
+        {**g, "baseline_bbox": list(g["bbox"])}
+        for g in ground_truth_in_canonical(scene, long_edge=canonical_size[0])
     ]
     # A translation whose destination sits near an unrelated insertion produces
     # one region of evidence that supports either reading. Which reading is
@@ -175,7 +135,7 @@ def run_case(
         inlier_ratio=result.registration.inlier_ratio,
         detection=metrics,
         event_kind_accuracy=kind_acc,
-        expected_events=len(primary),
+        expected_events=len(primary_scaled),
         reported_events=len(result.events),
         per_event=details,
         notes=result.registration.notes,

@@ -72,14 +72,18 @@ class LocalStore:
     name = "local"
 
     def __init__(self, root: str | Path) -> None:
-        self.root = Path(root)
+        # Resolved once, here. A relative root would otherwise be compared against
+        # the absolute paths that come back from ``_path``, and the comparison
+        # raises rather than failing quietly - so the default configuration, which
+        # uses the relative path "data", would break every directory listing.
+        self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 
     def _path(self, key: str) -> Path:
         p = (self.root / validate_key(key)).resolve()
         # Belt and braces: resolve() can still land outside root via a symlink.
-        if not str(p).startswith(str(self.root.resolve())):
+        if not str(p).startswith(str(self.root)):
             raise StoreError(f"key escapes the storage root: {key!r}")
         return p
 

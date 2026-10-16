@@ -72,7 +72,13 @@ class CoverageMap:
     canonical_size: tuple[int, int] = (1600, 1200)
 
     def heatmap(self, size: tuple[int, int] | None = None) -> np.ndarray:
-        """Render the coverage score as a BGR heatmap at canonical size."""
+        """Render the coverage score as a BGR heatmap.
+
+        Without ``size`` the result is at *grid* resolution - one pixel per cell,
+        which is the honest representation of a per-cell measurement. Pass a size
+        to have it resized for display, and accept that the interpolation invents
+        smoothness the measurement does not have.
+        """
         score = self.score()
         norm = np.clip(score * 255, 0, 255).astype(np.uint8)
         colour = cv2.applyColorMap(norm, cv2.COLORMAP_VIRIDIS)
@@ -250,6 +256,15 @@ def view_requests(
     centre of the frame, which is the mapping an operator intuitively follows:
     deficit on the left -> "pan left"; deficit at the edges -> "step back";
     deficit only high in the frame -> "tilt down".
+
+    **One request per direction.** A single uncaptured frame, one visit, one
+    narrow column - each produces a whole set of adjacent under-observed cells,
+    and they almost all resolve to the same instruction. Reporting them
+    individually gave an operator three separate "pan left" entries for three
+    cells down the same edge, which reads as three jobs rather than the one
+    movement that fixes all of them. Cells are therefore grouped by the direction
+    they imply, and each group contributes its worst cell as the representative -
+    the one the operator should aim at, since fixing it fixes the column.
     """
     score = cmap.score()
     rows, cols = score.shape
@@ -273,17 +288,44 @@ def view_requests(
         return []
 
     deficits.sort(reverse=True)
-    requests: list[ViewRequest] = []
-    covered_cells: set[tuple[int, int]] = set()
 
+    # Select spread-out candidates first, then collapse them. The selection is
+    # deliberately not capped at max_requests, because several candidates may
+    # merge into one instruction and the cap has to apply to the merged result -
+    # otherwise a scene with four distinct problems would report only one.
+    spread: list[tuple[float, int, int]] = []
+    covered_cells: set[tuple[int, int]] = set()
     for deficit, r, c in deficits:
-        if len(requests) >= max_requests:
+        if len(spread) >= max_requests * 4:
             break
-        # Skip cells adjacent to an already-requested one so guidance is spread.
+        # Skip cells adjacent to an already-selected one so candidates are spread.
         if any(abs(r - rr) <= 1 and abs(c - cc) <= 1 for rr, cc in covered_cells):
             continue
         covered_cells.add((r, c))
-        direction, reason = _direction_for(r, c, centre_r, centre_c, rows, cols)
+        spread.append((deficit, r, c))
+
+    grouped: dict[str, tuple[float, int, int, int]] = {}
+    for deficit, r, c in spread:
+        direction, _ = _direction_for(r, c, centre_r, centre_c, rows, cols)
+        prev = grouped.get(direction)
+        if prev is None:
+            grouped[direction] = (deficit, r, c, 1)
+        else:
+            # Keep the worst cell as the representative, but count the rest so
+            # the reason can say how much of the frame the instruction covers.
+            best, br, bc, count = prev
+            if deficit > best:
+                grouped[direction] = (deficit, r, c, count + 1)
+            else:
+                grouped[direction] = (best, br, bc, count + 1)
+
+    ordered = sorted(grouped.items(), key=lambda kv: -kv[1][0])[:max_requests]
+
+    requests: list[ViewRequest] = []
+    for direction, (deficit, r, c, count) in ordered:
+        _, reason = _direction_for(r, c, centre_r, centre_c, rows, cols)
+        if count > 1:
+            reason = f"{reason}; {count} cells in this direction are thin"
         requests.append(
             ViewRequest(
                 direction=direction,

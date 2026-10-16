@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Base layer.
+ *
+ * The ground is not flat black: a very faint engineering grid sits under
+ * everything, which gives large empty areas something to be and quietly signals
+ * that this is a measuring instrument rather than a document.
+ */
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --grid-line: rgba(255, 255, 255, 0.028);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ground text-ink antialiased;
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+
+  /* Numerals line up in columns everywhere they are compared. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: rgba(79, 227, 193, 0.28);
+  }
+
+  /* Focus is visible, because this is a tool someone operates quickly. */
+  :focus-visible {
+    outline: 2px solid #4fe3c1;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* A thin, unobtrusive scrollbar; the panels scroll a lot. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1e2a36 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #1e2a36;
+    border-radius: 9px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #2b3a4a;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-ground-edge bg-ground-panel/80 backdrop-blur-sm;
+  }
+
+  .label {
+    @apply font-mono text-2xs uppercase tracking-[0.14em] text-ink-faint;
+  }
+
+  /* The hairline that separates a panel heading from its body. */
+  .rule {
+    @apply h-px w-full bg-gradient-to-r from-ground-edge via-ground-edge to-transparent;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-md border
+      border-ground-edge bg-ground-raised px-3.5 py-2 text-sm font-medium text-ink
+      transition-colors duration-150 hover:border-ink-faint/50 hover:bg-ground-hover
+      disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ground-edge
+      disabled:hover:bg-ground-raised;
+  }
+
+  .btn-primary {
+    @apply border-accent/50 bg-accent/15 text-accent-bright hover:border-accent
+      hover:bg-accent/25 hover:text-accent-bright;
+  }
+
+  .btn-danger {
+    @apply border-kind-missing/40 text-kind-missing hover:border-kind-missing/70
+      hover:bg-kind-missing/10;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
+      font-mono text-2xs uppercase tracking-wider;
+  }
+}
+
+@layer utilities {
+  /* Placeholder blocks while data loads. */
+  .skeleton {
+    @apply rounded bg-ground-hover;
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.045) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 500px 100%;
+    background-repeat: no-repeat;
+    @apply animate-shimmer;
+  }
+
+  /* Honours the user's motion preference: everything still works, it just stops
+     moving. Animation here is explanatory, never load-bearing. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}

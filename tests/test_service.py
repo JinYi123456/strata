@@ -129,6 +129,26 @@ class TestLocalStore:
     def test_listing_a_missing_directory_is_empty_not_an_error(self, store: LocalStore):
         assert store.list_json("nothing/here") == []
 
+    def test_a_relative_root_works(self, tmp_path: Path, monkeypatch):
+        """The default data directory is relative, so this is the common case.
+
+        The bug this pins: the root was kept as given, so a relative root was
+        compared against the absolute paths the store produces and the listing
+        raised instead of returning. Only the *default* configuration hit it,
+        which is the worst place for a defect to hide.
+        """
+        monkeypatch.chdir(tmp_path)
+        relative = LocalStore("data")
+        relative.put_json("ledger/site-1/a.json", {"n": 1})
+        assert [e["n"] for e in relative.list_json("ledger/site-1")] == [1]
+        assert relative.root.is_absolute()
+
+    def test_a_relative_root_still_refuses_traversal(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        relative = LocalStore("data")
+        with pytest.raises(StoreError):
+            relative.get_bytes("../../escape.json")
+
 
 # --------------------------------------------------------------------------
 # Image boundary
@@ -519,3 +539,45 @@ class TestFullScan:
         # Whether or not it is right, the true changes are always disclosed for
         # a demo site, so a viewer can judge the result for themselves.
         assert all("bbox" in g for g in body["ground_truth"])
+
+    def test_ground_truth_and_detections_share_a_coordinate_space(self, client: TestClient):
+        """The answer key must be comparable with the answer.
+
+        The defect this pins: ground truth is recorded in the scene's own pixels
+        and detections are reported in canonical pixels, and the first version of
+        the answer-key panel served the raw boxes. Comparing the two put every
+        true box in the wrong place, so the panel reported that a system which had
+        found all four changes had found none - the panel lied, in the one place
+        whose entire purpose is to keep the system honest.
+        """
+        sid = client.post("/api/sessions", json={"site_id": "bay-4"}).json()["session_id"]
+        body = client.post(f"/api/sessions/{sid}/rescan", json={}).json()
+
+        overlay = body["images"]["overlay"]
+        primary = [g for g in body["ground_truth"] if g["kind"] != "moved_destination"]
+        assert primary, "the demo site should disclose its true changes"
+
+        # Every true box must be inside the frame the detections are reported in.
+        for g in primary:
+            x, y, w, h = g["bbox"]
+            assert 0 <= x < overlay["width"], g
+            assert 0 <= y < overlay["height"], g
+            assert x + w <= overlay["width"] + 1, g
+            assert y + h <= overlay["height"] + 1, g
+
+        # And each must actually coincide with something the system reported,
+        # since this scene is one the system handles correctly.
+        def overlaps(a, b) -> bool:
+            return (
+                a[0] < b[0] + b[2]
+                and b[0] < a[0] + a[2]
+                and a[1] < b[1] + b[3]
+                and b[1] < a[1] + a[3]
+            )
+
+        detected = [
+            (e["bbox"]["x"], e["bbox"]["y"], e["bbox"]["width"], e["bbox"]["height"])
+            for e in body["events"]
+        ]
+        unmatched = [g["object_id"] for g in primary if not any(overlaps(g["bbox"], d) for d in detected)]
+        assert not unmatched, f"true changes with no detection anywhere near them: {unmatched}"

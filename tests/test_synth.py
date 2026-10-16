@@ -26,7 +26,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "vision"))
 
-from strata_core.synth import make_scene, make_still_pair  # noqa: E402
+from strata_core.synth import (  # noqa: E402
+    canonical_size_for_scene,
+    ground_truth_in_canonical,
+    make_scene,
+    make_still_pair,
+)
 
 
 class TestDeterminism:
@@ -307,3 +312,48 @@ class TestSceneSave:
         assert len(meta["baseline_objects"]) == len(s.baseline_objects)
         assert len(meta["mutations"]) == len(s.mutations)
         assert len(meta["ground_truth_events"]) == len(s.ground_truth_events())
+
+
+class TestGroundTruthInCanonical:
+    """The shared conversion, which two consumers now depend on.
+
+    It lives in the core because the evaluation harness and the service both need
+    it, and because the first version of the service's answer-key panel
+    re-derived it, got it wrong, and reported that a system which had found every
+    change had found none.
+    """
+
+    def test_boxes_land_inside_the_canonical_frame(self):
+        scene = make_scene(seed=1021, n_mutations=4)
+        canonical = canonical_size_for_scene(scene)
+        boxes = ground_truth_in_canonical(scene)
+        assert boxes
+        for entry in boxes:
+            x, y, w, h = entry["bbox"]
+            assert 0 <= x < canonical[0], entry
+            assert 0 <= y < canonical[1], entry
+            assert w > 0 and h > 0, entry
+            assert x + w <= canonical[0] + 1, entry
+            assert y + h <= canonical[1] + 1, entry
+
+    def test_the_boxes_are_scaled_not_copied(self):
+        scene = make_scene(seed=1021, n_mutations=4)
+        canonical = canonical_size_for_scene(scene)
+        assert canonical[0] > scene.size[0], "the canonical frame is larger than the scene"
+        raw = scene.ground_truth_events()[0]["baseline_bbox"]
+        converted = ground_truth_in_canonical(scene)[0]["bbox"]
+        # A conversion that returned the raw numbers would leave the answer key
+        # in the wrong coordinate system, which is the whole failure mode.
+        assert converted[:2] != [float(v) for v in raw[:2]]
+
+    def test_translation_destinations_are_excluded_by_default(self):
+        scene = make_scene(seed=1021, n_mutations=4)
+        default = ground_truth_in_canonical(scene)
+        with_dest = ground_truth_in_canonical(scene, include_destinations=True)
+        assert not any(e["kind"] == "moved_destination" for e in default)
+        assert len(with_dest) >= len(default)
+
+    def test_each_entry_keeps_the_space_its_box_came_from(self):
+        scene = make_scene(seed=1021, n_mutations=4)
+        spaces = {e["bbox_space"] for e in ground_truth_in_canonical(scene)}
+        assert spaces <= {"baseline", "rescan"}

@@ -29,6 +29,8 @@ from typing import Iterable, Literal
 import cv2
 import numpy as np
 
+from .config import CANONICAL_LONG_EDGE
+
 MutationKind = Literal["remove", "add", "move", "recolour"]
 
 
@@ -376,6 +378,84 @@ def _camera_homography(
     P[2, 0] = rng.normal(0, 1.1e-4 * strength)
     P[2, 1] = rng.normal(0, 1.1e-4 * strength)
     return P @ S
+
+
+def canonical_size_for_scene(
+    scene: "SyntheticScene", long_edge: int = CANONICAL_LONG_EDGE
+) -> tuple[int, int]:
+    """The canonical frame a scan of this scene produces, as ``(width, height)``."""
+    w, h = scene.size
+    scale = long_edge / float(max(w, h))
+    return int(round(w * scale)), int(round(h * scale))
+
+
+def baseline_box_to_canonical(
+    bbox: Iterable[float],
+    src_size: tuple[int, int],
+    canonical_size: tuple[int, int],
+) -> tuple[float, float, float, float]:
+    """Scale a box from baseline-frame pixels into canonical pixels.
+
+    Ground truth is expressed in the scene's own coordinates because that is
+    where the mutations were applied; detections are reported in canonical
+    coordinates because that is where the comparison happens. Comparing one
+    against the other without converting compares two different units and yields
+    a score near zero no matter how good the detector is.
+    """
+    x, y, w, h = (float(v) for v in bbox)
+    sw, sh = src_size
+    cw, ch = canonical_size
+    sx, sy = cw / float(sw), ch / float(sh)
+    return (x * sx, y * sy, w * sx, h * sy)
+
+
+def ground_truth_in_canonical(
+    scene: "SyntheticScene",
+    *,
+    long_edge: int = CANONICAL_LONG_EDGE,
+    include_destinations: bool = False,
+) -> list[dict]:
+    """Every true change, with its box expressed in canonical pixels.
+
+    Lives in the core rather than beside any one consumer, because two callers
+    need it - the evaluation harness and the service's answer-key panel - and the
+    first version of the panel simply forgot to convert. Both now share this, so
+    they cannot disagree about where a change was.
+
+    Each entry keeps the space its box was recorded in, since that is the reason
+    the conversion is needed at all:
+
+    * most changes are recorded where the *baseline* saw them;
+    * an insertion has no baseline presence, so its only location is in the
+      *rescan*;
+    * a translation's destination is a real change in its own right, but this
+      system reports a translation as one event, so it is excluded by default.
+      Keeping it would ask a single event to satisfy two expected boxes and would
+      cap recall below 1.0 by construction. ``scripts/oracle.py`` measures that
+      cap.
+    """
+    canonical = canonical_size_for_scene(scene, long_edge)
+    baseline_size = (int(scene.size[0]), int(scene.size[1]))
+
+    out: list[dict] = []
+    for entry in scene.ground_truth_events():
+        kind = entry["kind"]
+        if kind == "moved_destination" and not include_destinations:
+            continue
+        space = entry.get("bbox_space", "baseline")
+        # Canonical space is the baseline's frame scaled up, and both captures
+        # are rendered at the same size, so one uniform scale covers both spaces.
+        box = baseline_box_to_canonical(entry["baseline_bbox"], baseline_size, canonical)
+        out.append(
+            {
+                "kind": kind,
+                "object_id": entry["object_id"],
+                "bbox": [float(v) for v in box],
+                "bbox_space": space,
+                "mutation": entry.get("mutation", {}),
+            }
+        )
+    return out
 
 
 def make_scene(

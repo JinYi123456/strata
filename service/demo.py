@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from strata_core.synth import SyntheticScene, make_scene
+from strata_core.synth import SyntheticScene, ground_truth_in_canonical, make_scene
 
 # Human names for the mutation kinds, in the language of the people who would
 # actually use this: someone checking a store room, not someone reading a paper.
@@ -144,24 +144,32 @@ def get_demo_site(site_id: str) -> DemoSite | None:
 
 
 def ground_truth_payload(site: DemoSite) -> list[dict[str, Any]]:
-    """The true changes, in the same shape the UI uses for detections.
+    """The true changes, in the same shape and the same units as a detection.
 
-    Only ever returned for demo sites, and the UI marks it as ground truth so it
-    can never be mistaken for something the system inferred.
+    The boxes come back in **canonical pixels**, converted by the core rather
+    than here. That conversion is load-bearing: ground truth is recorded in the
+    scene's own pixels and detections are reported in canonical pixels, so
+    serving the raw boxes put the answer key in a different coordinate system
+    from the result it was meant to check - and the panel then reported that a
+    system which had found every change had found none.
+
+    Destinations of a translation are excluded, matching how the system is
+    scored. A translation is one change and is reported as one event, so
+    enumerating its destination as a separate true change would make the answer
+    key look like it has a change the system never had a chance to report.
     """
     scene = site.build()
-    out: list[dict[str, Any]] = []
-    for entry in scene.ground_truth_events():
-        out.append(
-            {
-                "kind": entry["kind"],
-                "object_id": entry["object_id"],
-                "bbox": [int(v) for v in entry["baseline_bbox"]],
-                "bbox_space": entry["bbox_space"],
-                "mutation": entry["mutation"],
-            }
-        )
-    return out
+    entries = ground_truth_in_canonical(scene)
+    return [
+        {
+            "kind": entry["kind"],
+            "object_id": entry["object_id"],
+            "bbox": [round(float(v), 1) for v in entry["bbox"]],
+            "bbox_space": entry["bbox_space"],
+            "mutation": entry["mutation"],
+        }
+        for entry in entries
+    ]
 
 
 def thumbnail(scene: SyntheticScene, long_edge: int = 320) -> np.ndarray:
