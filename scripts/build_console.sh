@@ -19,11 +19,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-NODE_DIR="C:/Users/User/.workbuddy-ai/binaries/node/versions/22.22.2-6"
-if [ -d "$NODE_DIR" ]; then
-  export PATH="$NODE_DIR:$PATH"
-fi
-
 if ! command -v npm >/dev/null 2>&1; then
   echo "npm not found; install Node 20+ to build the console" >&2
   exit 1

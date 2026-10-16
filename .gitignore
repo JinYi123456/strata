@@ -16,12 +16,14 @@ dist/
 *.tsbuildinfo
 
 # --- Model weights (fetched by scripts/fetch_models.py) ---
+# Not committed: a repository carrying 52 MB of binaries is a repository that
+# gets slow to clone, and the pipeline runs without them on a SIFT fallback.
 vision/models/*.onnx
 vision/models/*.pt
 vision/models/*.pth
 !vision/models/.gitkeep
 
-# --- Local data, media and artifacts ---
+# --- Local data and generated media ---
 data/
 sessions/
 artifacts/
@@ -38,11 +40,6 @@ artifacts/
 !web/public/**/*.png
 !web/public/**/*.svg
 
-# --- Tooling state (local working notes, not part of the product) ---
-.workbuddy-ai/
-.claude/
-.cursor/
-
 # --- Secrets ---
 .env
 .env.*
@@ -50,13 +47,18 @@ artifacts/
 *.pem
 *.key
 
-# --- AWS / build output ---
+# --- Build and infrastructure output ---
 build/
 .cache/
 aws-sam/
 samconfig.toml
 .aws-sam/
 
-# --- Deployment tracking (local tooling state, not part of the product) ---
-.wbapp_*.genie
-.workbuddy/
+# --- Local tooling state ---
+# Working notes and editor directories that belong to whoever is at the machine
+# rather than to the project. Kept generic on purpose: the repository should not
+# carry a record of which tools a contributor happens to run. Anything specific
+# to one machine belongs in .git/info/exclude, which is never committed.
+.*-ai/
+.*-agent/
+.*-state/

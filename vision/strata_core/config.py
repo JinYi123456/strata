@@ -256,8 +256,10 @@ class PipelineConfig:
     events: EventConfig = field(default_factory=EventConfig)
     # Determinism: seed every stochastic step.
     seed: int = 20261026
-    # The estimator label recorded in the ledger, e.g. "cool-graviton4" or
-    # "baseline-x86". Purely provenance; never affects the math.
+    # Free-text label for the machine a run happened on, recorded in the ledger as
+    # provenance - for example "x86-laptop" or "arm64-server". Purely descriptive:
+    # it is never read by the math, and a run with a different label produces
+    # byte-identical output.
     executor: str = "baseline-local"
 
     def to_dict(self) -> dict[str, Any]:

@@ -49,8 +49,10 @@ ProgressFn = Callable[[str, float], None]
 class StageTiming:
     """Wall-clock cost of each stage, in milliseconds.
 
-    Recorded on every run so that the COOL/Graviton comparison is a by-product
-    of normal operation rather than a separate benchmark rig.
+    Recorded on every run rather than only under a profiler, so that "which stage
+    is slow, and on which hardware" is answered by normal operation instead of
+    requiring a separate benchmarking rig. A deployment that keeps these numbers
+    accumulates a performance history for free.
     """
 
     extract_baseline_ms: float = 0.0
@@ -110,7 +112,13 @@ class ScanResult:
         return out
 
     def to_summary(self) -> dict[str, Any]:
-        """Judge-facing, JSON-serialisable summary."""
+        """A complete, JSON-serialisable account of the run.
+
+        Everything a report or an integration needs, with no numpy arrays and no
+        paths: the registration provenance, the diff statistics, every typed
+        event, the coverage state, and the per-stage timings. If a number appears
+        anywhere in this project's evaluation, it comes from here.
+        """
         return {
             "version": "1.0",
             "feature_backend": self.feature_backend,
