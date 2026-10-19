@@ -72,7 +72,10 @@ record a site  ──►  re-scan it later  ──►  review the change set  �
 
 ## Quick start
 
-Requires Python 3.11+.
+Requires Python 3.11+ for the declared ranges in `requirements.txt`. To
+reproduce the published figures exactly, install `requirements.lock`, which pins
+numpy 2.5.4 — and that needs **Python 3.12 or newer**. CI tests both claims:
+3.13 and 3.12 against the lock, 3.11 against the ranges.
 
 ```bash
 # 1. Environment

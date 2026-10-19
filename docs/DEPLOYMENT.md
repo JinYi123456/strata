@@ -24,6 +24,10 @@ python scripts/serve.py
 # → http://127.0.0.1:8000
 ```
 
+Python 3.11 or newer installs the ranges. The locked set
+(`requirements.lock`, the environment every published figure was measured on)
+pins numpy 2.5.4, which requires 3.12+.
+
 With `PORT` set, the service binds `0.0.0.0` automatically. A service bound to
 loopback is unreachable from outside its own container, which is a silent and
 total failure on every hosting platform.
@@ -339,8 +343,9 @@ worse than none.
   79 end-to-end** (468 total), including the Lambda handler's event contract and
   its non-finite-number case, the managed-storage contract, the structured-log
   formatter and its redaction, and the documentation-vs-artefact agreement tests.
-  `.github/workflows/ci.yml` runs all of it on Python 3.13 and 3.11, re-runs the
-  24-case benchmark and gates it, and builds the console from source.
+  `.github/workflows/ci.yml` runs all of it on Python 3.13 and 3.12 against the
+  locked set and on 3.11 against the declared ranges, re-runs the 24-case
+  benchmark and gates it against floors, and builds the console from source.
 - The service runs locally and serves the console and API on one port.
 - The evaluation reproduces its published figures exactly (0.665 px, P 0.9375,
   R 0.8542, F1 0.8875, 0 still-pair false positives).

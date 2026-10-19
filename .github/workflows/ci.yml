@@ -24,10 +24,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13 is the interpreter requirements.lock was measured on. 3.11 is the
-        # documented floor, and it is tested because "requires Python 3.11+" is a
-        # claim a reviewer will try.
-        python-version: ["3.13", "3.11"]
+        include:
+          # 3.13 is the interpreter requirements.lock was measured on, so it runs
+          # the exact set the published numbers came from.
+          - python-version: "3.13"
+            deps: lock
+          # The lock pins numpy 2.5.4, which requires Python >= 3.12. That is a
+          # hard floor for reproducing the figures, and nothing below it can
+          # install the measured set at all.
+          - python-version: "3.12"
+            deps: lock
+          # README says the ranges in requirements.txt install on a wider set of
+          # interpreters. 3.11 is the documented floor, so it is tested against
+          # the ranges rather than the lock - which is the claim being made.
+          - python-version: "3.11"
+            deps: ranges
     steps:
       - uses: actions/checkout@v4
 
@@ -36,14 +47,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install the measured dependency set
-        # Lock first, then the dev ranges: the lock pins exact versions with ==,
-        # so the dev file's ranges are already satisfied and nothing drifts.
-        # httpx is only needed by the FastAPI test client, and boto3 by the
-        # managed-storage tests, which is why they are not in the runtime lock.
+      - name: Install dependencies
+        # "lock" installs the exact set the figures were measured on; "ranges"
+        # installs what the documentation tells a reviewer to install.
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.lock
+          if [ "${{ matrix.deps }}" = lock ]; then
+            pip install -r requirements.lock
+          else
+            pip install -r requirements.txt
+          fi
           pip install -r requirements-dev.txt
 
       - name: Fast unit tests
