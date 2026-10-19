@@ -1,0 +1,56 @@
+"""The deployment contract, read out of ``deploy/deploy.sh``.
+
+Both storage writers in this project - :class:`service.store.S3Store` for the
+HTTP service, and ``deploy/handler.py`` for the Lambda - have to write items into
+a table that a shell script creates. When the two drifted apart, the managed
+path failed on its first write in production and no test noticed, because the
+table only exists in an AWS account.
+
+So the script is the source of truth here, and these helpers parse it. Changing
+``deploy.sh`` without changing the code that writes to it fails the suite, which
+is the only way this contract can be checked without an account.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DEPLOY_SH = ROOT / "deploy" / "deploy.sh"
+
+
+def _create_table_block() -> str:
+    text = DEPLOY_SH.read_text(encoding="utf-8")
+    assert "aws dynamodb create-table" in text, "deploy.sh no longer creates a table"
+    return text.split("aws dynamodb create-table", 1)[1].split("--billing-mode")[0]
+
+
+def declared_key_schema() -> list[tuple[str, str]]:
+    """``[(attribute, role)]`` in declaration order, e.g. ``[("pk","HASH"),("sk","RANGE")]``."""
+    return re.findall(
+        r"AttributeName=([A-Za-z0-9_]+),KeyType=(HASH|RANGE)", _create_table_block()
+    )
+
+
+def declared_attribute_types() -> dict[str, str]:
+    return dict(
+        re.findall(
+            r"AttributeName=([A-Za-z0-9_]+),AttributeType=(S|N)", _create_table_block()
+        )
+    )
+
+
+def granted_actions(service: str) -> set[str]:
+    """The DynamoDB/S3 actions the role policy in ``deploy.sh`` allows."""
+    text = DEPLOY_SH.read_text(encoding="utf-8").replace('\\"', '"')
+    allowed: set[str] = set()
+    for group in re.findall(r'"Action":\[([^\]]*)\]', text):
+        allowed.update(re.findall(rf'"{service}:([A-Za-z]+)"', group))
+    for single in re.findall(rf'"Action":"{service}:([A-Za-z]+)"', text):
+        allowed.add(single)
+    return allowed
+
+
+def key_attributes() -> list[str]:
+    return [attr for attr, _role in declared_key_schema()]

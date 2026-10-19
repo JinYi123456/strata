@@ -352,6 +352,18 @@ class SessionManager:
         if record is None:
             raise SessionError(f"scan {scan_index} is missing from storage")
 
+        # A scan's stored outcome is "declined" while it sits at the gate, meaning
+        # only "prepared, nothing written yet". Carrying that label into the ledger
+        # recorded an approved change set as a declined one - the history said the
+        # opposite of what the operator decided, in the one field an auditor reads.
+        scan_outcome = record.get("outcome", "unknown")
+        if approved and scan_outcome == "aborted":
+            raise SessionError(
+                "this scan stopped before it produced a change set; there is "
+                "nothing to approve"
+            )
+        outcome = "finalized" if approved else scan_outcome
+
         registration = record.get("registration") or {}
         entry = {
             "entry_id": _new_id("led"),
@@ -359,7 +371,7 @@ class SessionManager:
             "site_id": session.site_id,
             "scan_index": scan_index,
             "recorded_at": _now(),
-            "outcome": record.get("outcome", "unknown"),
+            "outcome": outcome,
             "approved": bool(approved),
             "note": note,
             "event_totals": record.get("event_totals", {}),

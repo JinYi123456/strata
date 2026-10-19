@@ -298,6 +298,62 @@ class TestCommitRequiresSomethingToCommit:
         assert body == {"site_id": "bay-4", "entries": []}
 
 
+class TestCommitRecordsTheDecisionThatWasMade:
+    """The ledger must not say the opposite of what the human decided.
+
+    A scan sits at the gate with outcome ``declined``, meaning only "prepared,
+    nothing written yet". Copying that label into the ledger entry recorded an
+    *approved* change set as a declined one, and the console renders that field
+    in the history. These run without a scan because the defect was in the
+    bookkeeping, not in the vision.
+    """
+
+    @staticmethod
+    def _session_awaiting_a_decision(store: LocalStore, scan_outcome: str) -> str:
+        mgr = SessionManager(store)
+        session = mgr.create_session(site_id="bay-4")
+        session.scans = 1
+        mgr.store.put_json(mgr._state_key(session.session_id), session.to_state())
+        mgr.store.put_json(
+            mgr._scan_key(session.session_id, 0),
+            {
+                "outcome": scan_outcome,
+                "registration": {"confidence": 0.91},
+                "event_totals": {"added": 1, "missing": 1},
+            },
+        )
+        return session.session_id
+
+    def test_an_approved_scan_becomes_finalized_in_the_ledger(self, store: LocalStore):
+        mgr = SessionManager(store)
+        sid = self._session_awaiting_a_decision(store, "declined")
+        entry = mgr.commit(sid, approved=True, note="checked the pick list")
+        assert entry["outcome"] == "finalized"
+        assert entry["approved"] is True
+        assert entry["decision_made_by"] == "human"
+
+    def test_a_withheld_scan_stays_declined(self, store: LocalStore):
+        mgr = SessionManager(store)
+        sid = self._session_awaiting_a_decision(store, "declined")
+        entry = mgr.commit(sid, approved=False, note="too blurry to trust")
+        assert entry["outcome"] == "declined"
+        assert entry["approved"] is False
+
+    def test_an_aborted_scan_cannot_be_approved(self, store: LocalStore):
+        """Nothing was produced, so there is nothing for a human to commit."""
+        mgr = SessionManager(store)
+        sid = self._session_awaiting_a_decision(store, "aborted")
+        with pytest.raises(SessionError, match="nothing to approve"):
+            mgr.commit(sid, approved=True)
+
+    def test_the_decision_survives_a_read_of_the_site_history(self, store: LocalStore):
+        mgr = SessionManager(store)
+        sid = self._session_awaiting_a_decision(store, "declined")
+        mgr.commit(sid, approved=True)
+        entries = mgr.ledger("bay-4")
+        assert [e["outcome"] for e in entries] == ["finalized"]
+
+
 class TestRescanPreconditions:
     def test_an_uploaded_session_needs_frames_for_a_rescan(self, client: TestClient):
         sid = client.post(
@@ -415,6 +471,7 @@ class TestFullScan:
         assert r.status_code == 200, r.text
         entry = r.json()
         assert entry["approved"] is True
+        assert entry["outcome"] == "finalized"
         assert entry["decision_made_by"] == "human"
         assert entry["note"] == "Verified against the pick list."
         assert entry["event_totals"] == scan["event_totals"]
@@ -432,6 +489,7 @@ class TestFullScan:
             f"/api/sessions/{sid}/commit", json={"approved": False, "note": "Blurry."}
         ).json()
         assert entry["approved"] is False
+        assert entry["outcome"] == "declined"
         assert client.get(f"/api/sessions/{sid}").json()["committed"] is False
 
     def test_the_ledger_is_append_only(self, client: TestClient):

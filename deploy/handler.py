@@ -136,6 +136,23 @@ def summarise(result: Any) -> dict[str, Any]:
     }
 
 
+def ledger_row(
+    prefix: str, site_id: str, session_id: str, payload: dict[str, Any], *, now_ms: int
+) -> dict[str, str]:
+    """One DynamoDB item, in the shape the deployed table accepts.
+
+    Same ``{pk, sk, doc}`` contract as ``service/store.py``, because both writers
+    target the one table that ``deploy/deploy.sh`` creates. The distinct prefix
+    keeps Lambda-written rows out of the service's own ledger listing rather than
+    mixing two record types into one partition.
+    """
+    return {
+        "pk": f"{prefix}/ledger/{site_id}",
+        "sk": f"{session_id}-{now_ms}.json",
+        "doc": json.dumps(payload),
+    }
+
+
 def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     """Run one scan.
 
@@ -187,15 +204,12 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
             payload["record_error"] = "no ledger table configured"
         else:
             try:
+                prefix = os.environ.get("STRATA_LEDGER_PREFIX", "lambda")
                 ddb().Table(table).put_item(
-                    Item={
-                        "site_id": site_id,
-                        "session_id": session_id,
-                        "created_at": int(time.time() * 1000),
-                        "event_count": len(payload["events"]),
-                        "registration_confidence": str(payload["registration"]["confidence"]),
-                        "payload": json.dumps(payload),
-                    }
+                    Item=ledger_row(
+                        prefix, site_id, session_id, payload,
+                        now_ms=int(time.time() * 1000),
+                    )
                 )
                 payload["recorded"] = True
             except Exception as exc:  # pragma: no cover - network path

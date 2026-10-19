@@ -135,6 +135,14 @@ class S3Store:
 
     boto3 is imported lazily so that a local deployment never needs it installed
     and never pays for its import at start-up.
+
+    The DynamoDB item is ``{pk, sk, doc}`` where ``pk`` is the parent of the
+    record key and ``sk`` its leaf, which is the same shape as the filesystem:
+    ``list_json(prefix)`` returns the records directly under ``prefix`` and no
+    others. ``deploy/deploy.sh`` creates the table with exactly this schema, and
+    a test asserts the two stay in step - a record written against a key schema
+    the table does not have fails on the first ``put_item`` in production, not
+    here.
     """
 
     name = "s3"
@@ -162,7 +170,15 @@ class S3Store:
         self._ddb = boto3.resource("dynamodb", region_name=region)
 
     def _object_key(self, key: str) -> str:
-        return f"{self.prefix}/{validate_key(key)}"
+        return f"{self.prefix}/{validate_key(key)}" if self.prefix else validate_key(key)
+
+    def _record_key(self, key: str) -> tuple[str, str]:
+        """Split a record key into the partition key and sort key it lives under."""
+        full = self._object_key(key)
+        parent, _, leaf = full.rpartition("/")
+        if not parent or not leaf:
+            raise StoreError(f"record keys must have a parent prefix: {key!r}")
+        return parent, leaf
 
     def put_bytes(self, key: str, data: bytes) -> None:
         self._s3.put_object(Bucket=self.bucket, Key=self._object_key(key), Body=data)
@@ -183,12 +199,18 @@ class S3Store:
             return False
 
     def put_json(self, key: str, obj: Any) -> None:
+        pk, sk = self._record_key(key)
         self._ddb.Table(self.table).put_item(
-            Item={"pk": validate_key(key), "doc": json.dumps(obj, default=str)}
+            Item={"pk": pk, "sk": sk, "doc": json.dumps(obj, default=str)}
         )
 
     def get_json(self, key: str) -> Any | None:
-        item = self._ddb.Table(self.table).get_item(Key={"pk": validate_key(key)}).get("Item")
+        pk, sk = self._record_key(key)
+        item = (
+            self._ddb.Table(self.table)
+            .get_item(Key={"pk": pk, "sk": sk})
+            .get("Item")
+        )
         if item is None:
             return None
         try:
@@ -197,22 +219,25 @@ class S3Store:
             log.warning("unreadable record %s: %s", key, exc)
             return None
 
-    def list_json(self, prefix: str) -> list[Any]:  # pragma: no cover - network path
-        from boto3.dynamodb.conditions import Attr  # noqa: PLC0415
+    def list_json(self, prefix: str) -> list[Any]:
+        from boto3.dynamodb.conditions import Key  # noqa: PLC0415
 
         table = self._ddb.Table(self.table)
-        scan_kwargs: dict[str, Any] = {"FilterExpression": Attr("pk").begins_with(prefix)}
+        parent = self._object_key(prefix.rstrip("/"))
+        query_kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("pk").eq(parent)
+        }
         out: list[Any] = []
         while True:
-            resp = table.scan(**scan_kwargs)
+            resp = table.query(**query_kwargs)
             for item in resp.get("Items", []):
                 try:
                     out.append(json.loads(item["doc"]))
-                except (json.JSONDecodeError, KeyError):
-                    continue
+                except (json.JSONDecodeError, KeyError):  # pragma: no cover
+                    log.warning("unreadable record under %s", parent)
             if "LastEvaluatedKey" not in resp:
                 break
-            scan_kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+            query_kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         return out
 
 

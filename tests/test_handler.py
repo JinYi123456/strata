@@ -26,6 +26,7 @@ DEPLOY = ROOT / "deploy"
 if str(DEPLOY) not in sys.path:
     sys.path.insert(0, str(DEPLOY))
 
+from contract import key_attributes  # noqa: E402 - tests/ is on sys.path via pytest
 from strata_core.synth import make_scene  # noqa: E402
 
 
@@ -39,10 +40,17 @@ def mod(monkeypatch):
 
 
 class FakeTable:
+    """A table that rejects items the way DynamoDB rejects them: by key schema."""
+
     def __init__(self) -> None:
         self.items: list[dict] = []
 
     def put_item(self, Item):  # noqa: N803 - boto3 spells it this way
+        missing = [a for a in key_attributes() if a not in Item]
+        if missing:
+            raise AssertionError(
+                f"item does not match the deployed table schema; missing {missing}"
+            )
         self.items.append(Item)
 
 
@@ -68,6 +76,16 @@ def _event(**overrides) -> dict:
 # --------------------------------------------------------------------------
 # Fast paths: the handler must fail cleanly, not raise
 # --------------------------------------------------------------------------
+
+def test_the_ledger_row_matches_the_deployed_table_schema():
+    """The row shape is a contract with deploy.sh, checked without an account."""
+    handler = importlib.import_module("handler")
+    row = handler.ledger_row("lambda", "bay-4", "s-1", {"ok": True}, now_ms=1700000000000)
+    assert sorted(row) == sorted([*key_attributes(), "doc"])
+    assert row["pk"] == "lambda/ledger/bay-4"
+    assert row["sk"] == "s-1-1700000000000.json"
+    assert json.loads(row["doc"]) == {"ok": True}
+    assert all(isinstance(v, str) for v in row.values())
 
 def test_missing_fields_return_a_typed_error(mod):
     result = mod.handler({"site_id": "bay-4"}, None)
@@ -172,8 +190,12 @@ def test_record_writes_one_ledger_row(mod, monkeypatch):
     assert result["recorded"] is True
     assert len(fake.table.items) == 1
     row = fake.table.items[0]
-    assert row["site_id"] == "bay-4"
-    assert row["session_id"] == "s-1"
-    assert row["event_count"] == len(result["events"])
-    # The ledger stores the payload, so a row is readable on its own.
-    assert json.loads(row["payload"])["ok"] is True
+    # The row is written against the key schema deploy.sh creates the table with
+    # - the same contract service/store.py writes to. A row that does not match
+    # it is a ValidationException in production, not a test failure here.
+    assert row["pk"] == "lambda/ledger/bay-4"
+    assert row["sk"].startswith("s-1-")
+    payload = json.loads(row["doc"])
+    assert payload["ok"] is True
+    assert payload["site_id"] == "bay-4"
+    assert len(payload["events"]) == len(result["events"])

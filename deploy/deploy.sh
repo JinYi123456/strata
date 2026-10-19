@@ -10,145 +10,214 @@
 #
 # Requires: awscli v2, docker with buildx, and credentials for the target account.
 #
-#   ./deploy/deploy.sh
+#   ./deploy/deploy.sh              # deploy for real
+#   ./deploy/deploy.sh --dry-run    # print what would be created, touch nothing
 #
 # Everything it creates is tagged Project=strata so teardown.sh can find it.
 
 set -euo pipefail
 
+DRY_RUN=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=1 ;;
+    *) echo "unknown argument: $arg (try --dry-run)" >&2; exit 2 ;;
+  esac
+done
+
+# In dry-run nothing is created, so the account id is not needed and asking for
+# it would make the mode useless: it is the one command a reviewer can run
+# without an account to see exactly what a deployment would do.
+if [ "$DRY_RUN" = "1" ]; then
+  ACCOUNT="${STRATA_ACCOUNT:-<account>}"
+else
+  ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+fi
+
 REGION="${AWS_REGION:-${STRATA_AWS_REGION:-us-east-1}}"
 PREFIX="${STRATA_PREFIX:-strata}"
 FUNCTION="${PREFIX}-vision"
 ROLE_NAME="${PREFIX}-lambda-role"
-BUCKET="${STRATA_BUCKET:-${PREFIX}-sessions-$(aws sts get-caller-identity --query Account --output text)}"
+BUCKET="${STRATA_BUCKET:-${PREFIX}-sessions-${ACCOUNT}}"
 TABLE="${STRATA_TABLE:-${PREFIX}-ledger}"
 REPO="${PREFIX}-vision"
 TAG="${STRATA_TAG:-$(date +%Y%m%d-%H%M%S)}"
+# A public function URL is an unauthenticated compute endpoint. Reserving
+# concurrency bounds what one runaway client can bill: at 3008 MB x 5
+# concurrent executions the worst case is bounded, not open-ended.
+RESERVED_CONCURRENCY="${STRATA_RESERVED_CONCURRENCY:-5}"
 
-ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
 IMAGE="${REGISTRY}/${REPO}:${TAG}"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
-say "account ${ACCOUNT} · region ${REGION}"
+run() {
+  if [ "$DRY_RUN" = "1" ]; then
+    printf '    [dry-run] %s\n' "$*"
+    return 0
+  fi
+  "$@"
+}
+
+say "account ${ACCOUNT} · region ${REGION}$([ "$DRY_RUN" = "1" ] && printf ' · dry run')"
 
 # ---------------------------------------------------------------- S3 ---------
-if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-  echo "    bucket exists: ${BUCKET}"
-else
+if [ "$DRY_RUN" = "1" ] || ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
   echo "    creating bucket: ${BUCKET}"
   if [ "$REGION" = "us-east-1" ]; then
-    aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" >/dev/null
+    run aws s3api create-bucket --bucket "$BUCKET" --region "$REGION"
   else
-    aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
-      --create-bucket-configuration LocationConstraint="$REGION" >/dev/null
+    run aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
+      --create-bucket-configuration LocationConstraint="$REGION"
   fi
-  aws s3api put-public-access-block --bucket "$BUCKET" \
+  run aws s3api put-public-access-block --bucket "$BUCKET" \
     --public-access-block-configuration \
     "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
-  aws s3api put-bucket-encryption --bucket "$BUCKET" \
+  run aws s3api put-bucket-encryption --bucket "$BUCKET" \
     --server-side-encryption-configuration \
     '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+else
+  echo "    bucket exists: ${BUCKET}"
 fi
-aws s3api put-bucket-tagging --bucket "$BUCKET" \
+[ "$DRY_RUN" = "1" ] || aws s3api put-bucket-tagging --bucket "$BUCKET" \
   --tagging "TagSet=[{Key=Project,Value=${PREFIX}}]" 2>/dev/null || true
 
 # ------------------------------------------------------------ DynamoDB ------
-if aws dynamodb describe-table --table-name "$TABLE" --region "$REGION" >/dev/null 2>&1; then
-  echo "    table exists: ${TABLE}"
-else
+# The key schema is the storage contract that service/store.py writes against:
+# pk is the parent of a record key, sk its leaf. Changing either side without
+# the other makes the first put_item in production a ValidationException, so
+# tests/test_store_aws.py asserts this block and that module agree.
+if [ "$DRY_RUN" = "1" ] || ! aws dynamodb describe-table --table-name "$TABLE" --region "$REGION" >/dev/null 2>&1; then
   echo "    creating table: ${TABLE}"
-  aws dynamodb create-table --table-name "$TABLE" --region "$REGION" \
-    --attribute-definitions AttributeName=site_id,AttributeType=S \
-                            AttributeName=session_id,AttributeType=S \
-    --key-schema AttributeName=site_id,KeyType=HASH \
-                 AttributeName=session_id,KeyType=RANGE \
+  run aws dynamodb create-table --table-name "$TABLE" --region "$REGION" \
+    --attribute-definitions AttributeName=pk,AttributeType=S \
+                            AttributeName=sk,AttributeType=S \
+    --key-schema AttributeName=pk,KeyType=HASH \
+                 AttributeName=sk,KeyType=RANGE \
     --billing-mode PAY_PER_REQUEST \
-    --tags Key=Project,Value="$PREFIX" >/dev/null
-  aws dynamodb wait table-exists --table-name "$TABLE" --region "$REGION"
+    --tags Key=Project,Value="$PREFIX"
+  [ "$DRY_RUN" = "1" ] || aws dynamodb wait table-exists --table-name "$TABLE" --region "$REGION"
+else
+  echo "    table exists: ${TABLE}"
 fi
 
 # ----------------------------------------------------------------- ECR ------
-if aws ecr describe-repositories --repository-names "$REPO" --region "$REGION" >/dev/null 2>&1; then
-  echo "    repo exists: ${REPO}"
-else
+if [ "$DRY_RUN" = "1" ] || ! aws ecr describe-repositories --repository-names "$REPO" --region "$REGION" >/dev/null 2>&1; then
   echo "    creating repo: ${REPO}"
-  aws ecr create-repository --repository-name "$REPO" --region "$REGION" \
+  run aws ecr create-repository --repository-name "$REPO" --region "$REGION" \
     --image-scanning-configuration scanOnPush=true \
-    --tags Key=Project,Value="$PREFIX" >/dev/null
+    --tags Key=Project,Value="$PREFIX"
+else
+  echo "    repo exists: ${REPO}"
 fi
 
-aws ecr get-login-password --region "$REGION" \
-  | docker login --username AWS --password-stdin "$REGISTRY"
-
-say "building arm64 image ${IMAGE}"
-docker buildx build --platform linux/arm64 \
-  -f deploy/Dockerfile -t "$IMAGE" --push .
+if [ "$DRY_RUN" = "1" ]; then
+  printf '    [dry-run] docker buildx build --platform linux/arm64 -f deploy/Dockerfile -t %s --push .\n' "$IMAGE"
+else
+  aws ecr get-login-password --region "$REGION" \
+    | docker login --username AWS --password-stdin "$REGISTRY"
+  say "building arm64 image ${IMAGE}"
+  docker buildx build --platform linux/arm64 \
+    -f deploy/Dockerfile -t "$IMAGE" --push .
+fi
 
 # ------------------------------------------------------------- IAM role -----
-if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
-  echo "    role exists: ${ROLE_NAME}"
-else
+if [ "$DRY_RUN" = "1" ] || ! aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
   echo "    creating role: ${ROLE_NAME}"
-  aws iam create-role --role-name "$ROLE_NAME" --tags Key=Project,Value="$PREFIX" \
+  run aws iam create-role --role-name "$ROLE_NAME" --tags Key=Project,Value="$PREFIX" \
     --assume-role-policy-document '{
       "Version":"2012-10-17",
       "Statement":[{"Effect":"Allow",
         "Principal":{"Service":"lambda.amazonaws.com"},
         "Action":"sts:AssumeRole"}]}' >/dev/null
-  aws iam attach-role-policy --role-name "$ROLE_NAME" \
+  run aws iam attach-role-policy --role-name "$ROLE_NAME" \
     --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+else
+  echo "    role exists: ${ROLE_NAME}"
 fi
 
-# Scoped to the two resources this function actually touches.
-aws iam put-role-policy --role-name "$ROLE_NAME" --policy-name strata-data-access \
+# Scoped to the two resources this function actually touches. GetItem is listed
+# because the store reads records back, not only writes them.
+run aws iam put-role-policy --role-name "$ROLE_NAME" --policy-name strata-data-access \
   --policy-document "{
     \"Version\":\"2012-10-17\",
     \"Statement\":[
       {\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\",\"s3:PutObject\"],
        \"Resource\":\"arn:aws:s3:::${BUCKET}/*\"},
-      {\"Effect\":\"Allow\",\"Action\":[\"dynamodb:PutItem\",\"dynamodb:Query\"],
+      {\"Effect\":\"Allow\",\"Action\":[\"dynamodb:PutItem\",\"dynamodb:GetItem\",\"dynamodb:Query\"],
        \"Resource\":\"arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/${TABLE}\"},
       {\"Effect\":\"Allow\",\"Action\":[\"cloudwatch:PutMetricData\"],\"Resource\":\"*\"}
     ]}"
 
-ROLE_ARN="$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)"
+if [ "$DRY_RUN" = "1" ]; then
+  ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/${ROLE_NAME}"
+else
+  ROLE_ARN="$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)"
+fi
 
 ENV_VARS="Variables={STRATA_S3_BUCKET=${BUCKET},STRATA_DDB_TABLE=${TABLE},STRATA_AWS_REGION=${REGION},STRATA_BACKEND=auto}"
 
 # ------------------------------------------------------------- Lambda -------
-if aws lambda get-function --function-name "$FUNCTION" --region "$REGION" >/dev/null 2>&1; then
+if [ "$DRY_RUN" = "0" ] && aws lambda get-function --function-name "$FUNCTION" --region "$REGION" >/dev/null 2>&1; then
   say "updating function"
-  aws lambda update-function-code --function-name "$FUNCTION" --region "$REGION" \
-    --image-uri "$IMAGE" >/dev/null
-  aws lambda wait function-updated --function-name "$FUNCTION" --region "$REGION"
-  aws lambda update-function-configuration --function-name "$FUNCTION" --region "$REGION" \
+  run aws lambda update-function-code --function-name "$FUNCTION" --region "$REGION" \
+    --image-uri "$IMAGE"
+  run aws lambda wait function-updated --function-name "$FUNCTION" --region "$REGION"
+  run aws lambda update-function-configuration --function-name "$FUNCTION" --region "$REGION" \
     --timeout 120 --memory-size 3008 \
-    --environment "$ENV_VARS" >/dev/null
+    --environment "$ENV_VARS"
 else
   say "creating function"
-  # Give IAM a moment to make the new role assumable.
-  sleep 12
-  aws lambda create-function --function-name "$FUNCTION" --region "$REGION" \
-    --package-type Image --code ImageUri="$IMAGE" \
-    --role "$ROLE_ARN" --architectures arm64 \
-    --timeout 120 --memory-size 3008 \
-    --environment "$ENV_VARS" \
-    --tags Project="$PREFIX" >/dev/null
-  aws lambda wait function-active --function-name "$FUNCTION" --region "$REGION"
+  # A role that was just created is not assumable immediately, and Lambda says
+  # so with a ValidationError. Polling the error we actually expect beats a
+  # fixed sleep that is simultaneously too short and too long.
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if [ "$DRY_RUN" = "1" ]; then
+      run aws lambda create-function --function-name "$FUNCTION" --region "$REGION" \
+        --package-type Image --code ImageUri="$IMAGE" \
+        --role "$ROLE_ARN" --architectures arm64 \
+        --timeout 120 --memory-size 3008 \
+        --environment "$ENV_VARS" \
+        --tags Project="$PREFIX"
+      break
+    fi
+    if ERR="$(aws lambda create-function --function-name "$FUNCTION" --region "$REGION" \
+        --package-type Image --code ImageUri="$IMAGE" \
+        --role "$ROLE_ARN" --architectures arm64 \
+        --timeout 120 --memory-size 3008 \
+        --environment "$ENV_VARS" \
+        --tags Project="$PREFIX" 2>&1 >/dev/null)"; then
+      break
+    fi
+    if ! printf '%s' "$ERR" | grep -q "not authorized to perform: lambda:CreateFunction on role\|The role defined for the function cannot be assumed by Lambda"; then
+      printf '%s\n' "$ERR" >&2
+      exit 1
+    fi
+    echo "    role not assumable yet (attempt ${attempt}/10)"
+    sleep 5
+  done
+  [ "$DRY_RUN" = "1" ] || aws lambda wait function-active --function-name "$FUNCTION" --region "$REGION"
 fi
 
+run aws lambda put-function-concurrency --function-name "$FUNCTION" --region "$REGION" \
+  --reserved-concurrent-executions "$RESERVED_CONCURRENCY"
+
 # --------------------------------------------------------- Function URL -----
-if URL="$(aws lambda get-function-url-config --function-name "$FUNCTION" --region "$REGION" --query FunctionUrl --output text 2>/dev/null)"; then
+# Auth stays NONE because the smoke test and the judge demo hit it directly;
+# the reserved concurrency above is what bounds the cost of an open endpoint.
+# A deployment that puts this behind a real front door should switch to
+# AWS_IAM and drop the public permission statement.
+if [ "$DRY_RUN" = "0" ] && URL="$(aws lambda get-function-url-config --function-name "$FUNCTION" --region "$REGION" --query FunctionUrl --output text 2>/dev/null)"; then
   echo "    function url exists"
 else
-  URL="$(aws lambda create-function-url-config --function-name "$FUNCTION" \
-    --region "$REGION" --auth-type NONE --query FunctionUrl --output text)"
-  aws lambda add-permission --function-name "$FUNCTION" --region "$REGION" \
+  URL="$( [ "$DRY_RUN" = "1" ] && printf 'https://<dry-run>.lambda-url.%s.on.aws/' "$FUNCTION" || \
+    aws lambda create-function-url-config --function-name "$FUNCTION" \
+      --region "$REGION" --auth-type NONE --query FunctionUrl --output text )"
+  run aws lambda add-permission --function-name "$FUNCTION" --region "$REGION" \
     --statement-id FunctionURLAllowPublicAccess \
     --action lambda:InvokeFunctionUrl --principal '*' \
-    --function-url-auth-type NONE >/dev/null
+    --function-url-auth-type NONE
 fi
 
 cat <<EOF
@@ -161,11 +230,9 @@ cat <<EOF
   image      ${IMAGE}
   endpoint   ${URL}
 
-  smoke test:
+  Next: prove it ran, end to end, with real images and a real ledger write:
 
-  aws lambda invoke --function-name ${FUNCTION} --region ${REGION} \\
-    --cli-binary-format raw-in-base64-out \\
-    --payload '{"site_id":"demo","session_id":"s1","baseline":["demo/a.jpg"],"rescan":["demo/b.jpg"]}' \\
-    /tmp/out.json && cat /tmp/out.json
+    python deploy/verify.py --bucket ${BUCKET} --function ${FUNCTION} \\
+      --region ${REGION} --out deploy/verify-report.json
 ────────────────────────────────────────────────────────────
 EOF
