@@ -1,5 +1,7 @@
 # STRATA
 
+![test](https://github.com/JinYi123456/strata/actions/workflows/ci.yml/badge.svg)
+
 **Version control for the physical world.**
 
 Photograph a place once. Photograph it again later. Get a typed, confidence-scored
@@ -262,9 +264,9 @@ vision/
   models/            ONNX weights (fetched, not committed)
 service/             the HTTP API, session lifecycle, and the bundled console
 web/                 the console source (TypeScript, Next.js, Tailwind)
-scripts/             evaluation, model fetch, serving, console build, verification
-tests/               398 tests: 327 fast, 71 end-to-end behind `-m slow`
-deploy/              arm64 Lambda container, deploy + teardown, COOL benchmark
+scripts/             evaluation, figures and gates, model fetch, serving, console build, verification
+tests/               468 tests: 389 fast, 79 end-to-end behind `-m slow`
+deploy/              arm64 Lambda container, deploy + teardown + verify, COOL benchmark
 docs/                technical report, architecture, deployment, responsible use
 submission/          review guide: where everything lives
 Dockerfile           portable image for any container host

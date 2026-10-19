@@ -313,23 +313,36 @@ worse than none.
 
 **Verified in this build**
 
-- The full test suite passes: 327 fast tests and 71 end-to-end, including tests
-  for the Lambda handler itself (its event contract, its payload shape, and the
-  unregistrable-pair case that produces a non-finite number).
+- The full test suite passes on the locked dependency set: **389 fast tests and
+  79 end-to-end** (468 total), including the Lambda handler's event contract and
+  its non-finite-number case, the managed-storage contract, the structured-log
+  formatter and its redaction, and the documentation-vs-artefact agreement tests.
+  `.github/workflows/ci.yml` runs all of it on Python 3.13 and 3.11, re-runs the
+  24-case benchmark and gates it, and builds the console from source.
 - The service runs locally and serves the console and API on one port.
 - The evaluation reproduces its published figures exactly (0.665 px, P 0.9375,
   R 0.8542, F1 0.8875, 0 still-pair false positives).
 - The benchmark harness runs and produces comparable JSON on x86.
 
-**Requires an AWS account to execute**
+**Requires an AWS account to execute — and this is the honest gap**
 
-- `deploy/deploy.sh` and `deploy/benchmark/run_on_graviton.sh` are complete and
-  idempotent, but have not been run against a live account in this build. They
-  require: ECR push, Lambda create/update, S3, DynamoDB, IAM, EC2, and a
-  Marketplace subscription for the COOL AMI.
-- Consequently no Arm-vs-x86 ratio is published here. The harness produces it;
-  publishing a number that was not measured would be the one thing this project
-  is built not to do.
+- `deploy/deploy.sh`, `deploy/verify.py` and
+  `deploy/benchmark/run_on_graviton.sh` are complete and idempotent, but have
+  not been run against a live account in this build. They require: ECR push,
+  Lambda create/update, S3, DynamoDB, IAM, EC2, and a Marketplace subscription
+  for the COOL AMI.
+- Consequently **no Arm-vs-x86 ratio is published here**, and nothing in this
+  repository yet demonstrates a scan that executed on AWS. The harness produces
+  both; publishing a number that was not measured would be the one thing this
+  project is built not to do.
+- What *is* verified without an account: the handler's event contract and its
+  ledger row shape, the managed store's behaviour against a fake that validates
+  the way DynamoDB does (`tests/test_store_aws.py`), and the fact that the key
+  schema and IAM actions in `deploy.sh` are the ones the code actually uses.
 
-To complete it: set the environment variables in §2, run `./deploy/deploy.sh`,
-then §3.2 and §3.3. The comparison table writes itself.
+To close the gap: `./deploy/deploy.sh --dry-run` to read the plan, then
+`./deploy/deploy.sh`, then `python deploy/verify.py --record` to produce
+`deploy/verify-report.json` — architecture, image digest, latency, change set,
+the ledger row read back, and the CloudWatch tail. Then §3.2 and §3.3 for the
+Arm comparison. Each step is minutes of work and cents of compute; none of it
+has been done, and the submission should be read with that in mind.

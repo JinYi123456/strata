@@ -1,0 +1,149 @@
+name: test
+
+# The repository documents a test workflow; this is it. Three jobs, in the order
+# a reviewer would check them: the suite passes, the published numbers still
+# reproduce, and the console still builds from source.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: unit + end-to-end tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.13 is the interpreter requirements.lock was measured on. 3.11 is the
+        # documented floor, and it is tested because "requires Python 3.11+" is a
+        # claim a reviewer will try.
+        python-version: ["3.13", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install the measured dependency set
+        # Lock first, then the dev ranges: the lock pins exact versions with ==,
+        # so the dev file's ranges are already satisfied and nothing drifts.
+        # httpx is only needed by the FastAPI test client, and boto3 by the
+        # managed-storage tests, which is why they are not in the runtime lock.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock
+          pip install -r requirements-dev.txt
+
+      - name: Fast unit tests
+        run: python -m pytest -q
+
+      - name: Documented test counts match the real collection
+        # "389 fast, 79 end-to-end" is a claim in three documents. It drifted once
+        # already, and a count that quietly goes stale is how a test suite stops
+        # being evidence.
+        run: |
+          python - <<'EOF'
+          import re, subprocess, sys
+          from pathlib import Path
+
+          def collected(*args):
+              """(selected, total) from pytest's "389/468 tests collected" line."""
+              out = subprocess.run(
+                  [sys.executable, "-m", "pytest", "--collect-only", "-q", *args],
+                  capture_output=True, text=True, check=True,
+              ).stdout
+              match = re.search(r"(\d+)/(\d+) tests? collected", out)
+              if not match:
+                  sys.exit(f"could not read a collection count from:\n{out[-400:]}")
+              return int(match.group(1)), int(match.group(2))
+
+          fast, total = collected()
+          slow, total_slow = collected("-m", "slow")
+          assert total == total_slow, "pytest disagrees with itself about the suite size"
+          assert slow == total - fast, (fast, slow, total)
+          docs = Path("README.md").read_text(encoding="utf-8")
+          quoted = re.search(r"(\d+) tests: (\d+) fast, (\d+) end-to-end", docs)
+          print(f"collected {total}: {fast} fast, {slow} slow")
+          if not quoted:
+              sys.exit("README.md no longer states the test counts")
+          claimed = tuple(int(g) for g in quoted.groups())
+          if claimed != (total, fast, slow):
+              sys.exit(f"README says {claimed}, pytest says {(total, fast, slow)}")
+          print("documented counts agree")
+          EOF
+
+      - name: Fetch the feature weights
+        # The neural path is what the published numbers describe. Without the
+        # weights the pipeline falls back to SIFT and the end-to-end assertions
+        # below would be measuring a different system than the report claims.
+        run: python scripts/fetch_models.py
+
+      - name: End-to-end tests (real pipeline, agent and service)
+        run: python -m pytest -q -m slow --durations=12
+
+      - name: Console verification script is present and executable
+        run: test -x scripts/verify_ui.sh && test -f scripts/verify_ui.js
+
+  evaluation:
+    name: the published numbers still reproduce
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock -r requirements-dev.txt
+          python scripts/fetch_models.py
+
+      - name: Re-run the 24-case benchmark
+        run: python scripts/evaluate.py --cases 24 --out artifacts/eval
+
+      - name: Gate it against the documented floors
+        run: python scripts/gate.py --artifact artifacts/eval/evaluation.json
+
+      - name: The committed artefact still agrees with the documents
+        # docs/evaluation.json is the run the report quotes. This checks the
+        # prose against it; the step above checks a fresh run against the floors.
+        run: python -m pytest -q tests/test_docs_agree_with_artifact.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation
+          path: artifacts/eval/
+          if-no-files-found: warn
+
+  console:
+    name: the console builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: bash scripts/build_console.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: console
+          path: web/out
+          if-no-files-found: error

@@ -1,0 +1,14 @@
+# Shell scripts must keep LF. The repository is developed on Windows, where
+# core.autocrlf would otherwise hand back CRLF line endings, and a bash script
+# with CRLF fails on the first line with an error that names a nonexistent
+# interpreter.
+*.sh        text eol=lf
+*.py        text
+*.json      text
+*.md        text
+*.yml       text
+*.svg       text
+*.mp4       binary
+*.onnx      binary
+*.png       binary
+*.jpg       binary
