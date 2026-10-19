@@ -1,0 +1,28 @@
+# Render blueprint. Any container host works — this is just the shortest path
+# from the repository to a URL.
+#
+#   1. Push the repository to GitHub (already done).
+#   2. Render dashboard → New → Blueprint → pick the repository.
+#   3. It reads this file and builds ./Dockerfile.
+#
+# On memory: the pipeline holds two decoded frames plus a canonical warp and a
+# feature set of up to 2000 keypoints per side, and it runs two of those
+# concurrently by default. 512 MB is not enough; standard (2 GB) is comfortable.
+# If you want the free tier, set STRATA_MAX_CONCURRENT_SCANS=1 and expect the
+# neural backend to be slow rather than broken.
+
+services:
+  - type: web
+    name: strata
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: STRATA_EXECUTOR
+        value: local
+      - key: STRATA_DATA_DIR
+        value: /app/data
+      - key: STRATA_LOG_LEVEL
+        value: info

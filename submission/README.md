@@ -2,15 +2,18 @@
 
 Where everything lives, and what to look at first.
 
-**Live app** — https://fcbd487d1c0e428084b4f74d5993985f.sg2.agentos-app.run
+**Run the app** — `pip install -r requirements.txt && python scripts/serve.py`
+→ <http://127.0.0.1:8000>. No configuration, no API keys, no model download
+required to start; the five sample sites are generated on first run.
+
 **Demo video** — [strata-demo.mp4](../service/static/media/strata-demo.mp4) (2:45)
-· also served at `/media/strata-demo.mp4` from the live app
+· also served at `/media/strata-demo.mp4` when the app is running
 
 ---
 
 ## The five-minute version
 
-1. Open the live app. Pick **Loading Bay 4**.
+1. Open <http://127.0.0.1:8000>. Pick **Loading Bay 4**.
 2. Press **Run rescan**. The pipeline registers the second visit to the first and
    returns four typed changes.
 3. Open **Compare** and drag the divider — the two visits are in one frame, so
@@ -27,7 +30,7 @@ Where everything lives, and what to look at first.
 
 | | Where |
 |---|---|
-| **Working application** | Live URL above; source in `service/` and `web/` |
+| **Working application** | `python scripts/serve.py`; source in `service/` and `web/`; container recipe in `Dockerfile` |
 | **Technical report** | [`docs/TECHNICAL_REPORT.md`](../docs/TECHNICAL_REPORT.md) |
 | **Architecture diagram** | [`docs/architecture.svg`](../docs/architecture.svg) · [PNG](../docs/architecture.png) |
 | **Source code** | This repository |

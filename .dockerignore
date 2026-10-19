@@ -1,0 +1,32 @@
+.git
+.gitignore
+.github
+
+# Dependencies are installed from requirements.txt inside the image, not copied.
+node_modules
+web/node_modules
+web/.next
+web/out
+
+# Local state and build scratch.
+data
+artifacts
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Secrets and local configuration.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tooling markers.
+.wbapp_*.genie
+.workbuddy
+.workbuddy-ai

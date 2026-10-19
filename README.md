@@ -6,8 +6,9 @@ Photograph a place once. Photograph it again later. Get a typed, confidence-scor
 account of what changed — with the measurements behind every claim, and the
 reasoning that produced it, shown alongside the answer.
 
-**[Live app →](https://fcbd487d1c0e428084b4f74d5993985f.sg2.agentos-app.run)** — opens on
-five sample sites that need nothing uploaded.
+**Run it:** `pip install -r requirements.txt && python scripts/serve.py` →
+<http://127.0.0.1:8000>. Opens on five sample sites that need nothing uploaded.
+No configuration and no API keys required.
 
 ### Documentation
 

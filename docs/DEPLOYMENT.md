@@ -40,6 +40,50 @@ total failure on every hosting platform.
 
 ---
 
+## 1.1 Deploying to a container host
+
+The image serves the API and the prebuilt console on one port, so any container
+host works with no further configuration:
+
+```bash
+docker build -t strata .
+docker run -p 8000:8000 strata
+# → http://127.0.0.1:8000
+```
+
+`render.yaml` is included as the shortest path to a URL: push, then
+Render → New → Blueprint → pick the repository. Railway, Fly.io, Cloud Run and
+ECS take the same image.
+
+**Give it at least 2 GB of memory.** The pipeline holds two decoded frames, a
+canonical warp and up to 2000 keypoints per side, and runs two scans
+concurrently by default. At 512 MB it will not fail cleanly — it will thrash.
+On a 512 MB tier set `STRATA_MAX_CONCURRENT_SCANS=1` and expect the neural
+backend to be slow rather than broken.
+
+### Why not Vercel
+
+Vercel is a good host for the console and a poor host for this backend, for
+three specific reasons rather than a general one:
+
+1. **Function duration.** A scan takes ~2–15 s depending on backend and frame
+   size. Vercel's Hobby tier caps a function at 10 s; a scan would be killed
+   mid-pipeline.
+2. **No writable filesystem.** The local `Store` writes sessions to disk. On
+   Vercel that path is read-only outside `/tmp`, and `/tmp` does not survive
+   between invocations — so every scan would lose its baseline. It would need
+   the S3 backend, which means running in AWS anyway.
+3. **Bundle size.** OpenCV 5 plus NumPy is already ~100 MB, and the feature
+   weights add ~50 MB, against a 250 MB limit that also has to hold the runtime.
+
+If you want a Vercel deployment, the honest split is: static console on Vercel,
+vision workload on a container host or Lambda. `web/` exports statically
+(`npm run build` → `web/out`), and `STRATA_API_BASE` points the console at a
+remote API. That is a two-service architecture and it is more moving parts than
+one container, which is why the default is the single image.
+
+---
+
 ## 2. AWS — the vision workload on Graviton
 
 ```bash
