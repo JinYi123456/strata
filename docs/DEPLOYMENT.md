@@ -55,6 +55,28 @@ docker run -p 8000:8000 strata
 Render → New → Blueprint → pick the repository. Railway, Fly.io, Cloud Run and
 ECS take the same image.
 
+### The console on Vercel
+
+The static console is deployed separately at
+<https://strata-console-rouge.vercel.app>, built from `web/` on Vercel's own
+Next.js pipeline. That is the split §1.1 describes: the interface on a CDN, the
+vision workload on AWS.
+
+**It is not a working demo on its own, and is not offered as one.** The console
+calls `/api/...` on its own origin unless `NEXT_PUBLIC_API_BASE` is set at build
+time, so on Vercel it reaches the interface, lists nothing, and reports that the
+service is unreachable. Point it at the deployed AWS API and rebuild, and the
+same URL becomes the live endpoint. The working demonstration is the container
+above, or the film, until that rebuild happens.
+
+The first deploy attempt was rejected by Vercel's dependency gate: `next@15.1.6`
+pulls a `postcss` with published advisories, and the platform blocks the
+deployment rather than warning. `web/` is on `next@16.4.2` now — `npm audit`
+reports zero vulnerabilities, `tsc --noEmit` is clean, and the console was
+driven end to end in a browser on the new version: five sample sites, a real
+rescan producing four typed events, coverage guidance, the answer-key panel, and
+the approval gate recording `Recorded · scan #0 · finalized` in the history.
+
 **Give it at least 2 GB of memory.** The pipeline holds two decoded frames, a
 canonical warp and up to 2000 keypoints per side, and runs two scans
 concurrently by default. At 512 MB it will not fail cleanly — it will thrash.
