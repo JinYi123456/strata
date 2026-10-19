@@ -1,0 +1,138 @@
+{
+  "host": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 186 Stepping 3, GenuineIntel",
+    "cpus": 12,
+    "python": "3.13.14",
+    "opencv": "5.0.0",
+    "opencv_build": "upstream",
+    "cv2_module": "C:\\Users\\User\\.workbuddy-ai\\binaries\\python\\envs\\opencv5\\Lib\\site-packages\\cv2\\__init__.py"
+  },
+  "microbenchmarks": {
+    "resize_half": {
+      "median_ms": 1.195,
+      "p95_ms": 1.396,
+      "min_ms": 0.867,
+      "max_ms": 1.396,
+      "n": 20
+    },
+    "resize_2x": {
+      "median_ms": 1.383,
+      "p95_ms": 2.703,
+      "min_ms": 1.072,
+      "max_ms": 2.703,
+      "n": 20
+    },
+    "warp_affine": {
+      "median_ms": 4.408,
+      "p95_ms": 5.548,
+      "min_ms": 3.666,
+      "max_ms": 5.548,
+      "n": 20
+    },
+    "adaptive_threshold": {
+      "median_ms": 10.162,
+      "p95_ms": 12.091,
+      "min_ms": 9.365,
+      "max_ms": 12.091,
+      "n": 20
+    },
+    "find_contours": {
+      "median_ms": 16.296,
+      "p95_ms": 21.87,
+      "min_ms": 14.647,
+      "max_ms": 21.87,
+      "n": 20
+    },
+    "cvt_gray": {
+      "median_ms": 1.876,
+      "p95_ms": 2.428,
+      "min_ms": 1.534,
+      "max_ms": 2.428,
+      "n": 20
+    },
+    "cvt_hsv": {
+      "median_ms": 2.722,
+      "p95_ms": 4.112,
+      "min_ms": 1.829,
+      "max_ms": 4.112,
+      "n": 20
+    },
+    "gaussian_blur": {
+      "median_ms": 3.293,
+      "p95_ms": 3.739,
+      "min_ms": 2.985,
+      "max_ms": 3.739,
+      "n": 20
+    },
+    "absdiff": {
+      "median_ms": 2.966,
+      "p95_ms": 5.155,
+      "min_ms": 2.031,
+      "max_ms": 5.155,
+      "n": 20
+    },
+    "morphology": {
+      "median_ms": 4.135,
+      "p95_ms": 6.221,
+      "min_ms": 2.618,
+      "max_ms": 6.221,
+      "n": 20
+    }
+  },
+  "full_scan": {
+    "backend_requested": "auto",
+    "backend_resolved": "neural-lightglue",
+    "median_wall_ms": 16906.2,
+    "p95_wall_ms": 17025.3,
+    "scans_per_hour": 212.9,
+    "stage_median_ms": {
+      "extract_baseline_ms": 1980.9,
+      "extract_rescan_ms": 1894.9,
+      "match_ms": 5835.6,
+      "register_ms": 9.7,
+      "diff_ms": 1363.3,
+      "events_ms": 61.0,
+      "total_ms": 16587.2
+    },
+    "runs": [
+      {
+        "wall_ms": 16906.2,
+        "extract_baseline_ms": 2002.9,
+        "extract_rescan_ms": 1727.4,
+        "match_ms": 5835.6,
+        "register_ms": 8.7,
+        "diff_ms": 1363.3,
+        "events_ms": 66.3,
+        "total_ms": 16587.2
+      },
+      {
+        "wall_ms": 17025.3,
+        "extract_baseline_ms": 1980.9,
+        "extract_rescan_ms": 1956.5,
+        "match_ms": 6038.1,
+        "register_ms": 12.7,
+        "diff_ms": 1314.1,
+        "events_ms": 54.5,
+        "total_ms": 16719.2
+      },
+      {
+        "wall_ms": 16517.8,
+        "extract_baseline_ms": 1918.3,
+        "extract_rescan_ms": 1894.9,
+        "match_ms": 5592.8,
+        "register_ms": 9.7,
+        "diff_ms": 1520.7,
+        "events_ms": 61.0,
+        "total_ms": 16202.9
+      }
+    ]
+  },
+  "cost": {
+    "instance": "c7i.xlarge",
+    "hourly_usd": 0.1785,
+    "usd_per_1000_scans": 0.8383
+  },
+  "timestamp": "2026-10-19T11:00:22Z"
+}

@@ -6,6 +6,18 @@ Photograph a place once. Photograph it again later. Get a typed, confidence-scor
 account of what changed — with the measurements behind every claim, and the
 reasoning that produced it, shown alongside the answer.
 
+**[Live app →](https://f3ba7914438c401ca724dd1522121433.sg2.agentos-app.run)** — opens on
+five sample sites that need nothing uploaded.
+
+### Documentation
+
+| | |
+|---|---|
+| [Technical report](docs/TECHNICAL_REPORT.md) | Problem, architecture, OpenCV 5 implementation, evaluation, limitations |
+| [Architecture](docs/architecture.svg) | The four layers and where the vision workload runs |
+| [Deployment](docs/DEPLOYMENT.md) | Local, AWS Graviton, and the reproducible benchmark protocol |
+| [Responsible use](docs/RESPONSIBLE_USE.md) | What the system does not do, and why |
+
 ---
 
 ## The problem
