@@ -130,10 +130,12 @@ which is the difference between registering a shelf on a Tuesday and the same
 shelf under fluorescent light on a Friday.
 
 **It is fast enough to be interactive but slow enough to be worth optimising.**
-Measured on the development machine (x86, CPU only): ALIKED detect-and-describe
-is ~1.6 s per 960×640 frame; LightGlue matching is ~7.7 s per pair. That is the
-honest cost of the accuracy, and it is precisely the workload that a
-Graviton-optimised build targets.
+Measured on the development machine (x86, CPU only, 12 cores): ALIKED
+detect-and-describe is ~1.5–1.7 s per 960×720 frame, LightGlue matching is
+~5.2 s per pair, and a full scan is 14.3 s median. That is the honest cost of
+the accuracy, and it is precisely the workload that a Graviton-optimised build
+targets. The committed baseline is in
+`deploy/benchmark/results/x86-baseline.json`.
 
 **It fails in a way that must be guarded.** Two guards exist, both established
 by measurement rather than guessed:
@@ -441,9 +443,9 @@ where it stops working.
 - **Synthetic evaluation data.** The benchmark scenes are generated with known
   answers, which is the only place a ground-truth comparison is possible. Real
   captures can be uploaded through the app, but they have no answer key.
-- **Per-pair cost.** The neural path is accurate and slow (~9 s per frame pair
-  on x86 CPU). This is the workload the Arm optimisation targets, not a defect
-  to be hidden.
+- **Per-pair cost.** The neural path is accurate and slow (14.3 s median for a
+  full scan on x86 CPU). This is the workload the Arm optimisation targets, not
+  a defect to be hidden.
 
 ---
 

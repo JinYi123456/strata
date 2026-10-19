@@ -7,132 +7,132 @@
     "python": "3.13.14",
     "opencv": "5.0.0",
     "opencv_build": "upstream",
-    "cv2_module": "C:\\Users\\User\\.workbuddy-ai\\binaries\\python\\envs\\opencv5\\Lib\\site-packages\\cv2\\__init__.py"
+    "cv2_module": "site-packages/cv2/__init__.py"
   },
   "microbenchmarks": {
     "resize_half": {
-      "median_ms": 1.195,
-      "p95_ms": 1.396,
-      "min_ms": 0.867,
-      "max_ms": 1.396,
+      "median_ms": 1.538,
+      "p95_ms": 2.507,
+      "min_ms": 1.294,
+      "max_ms": 2.507,
       "n": 20
     },
     "resize_2x": {
-      "median_ms": 1.383,
-      "p95_ms": 2.703,
-      "min_ms": 1.072,
-      "max_ms": 2.703,
+      "median_ms": 2.32,
+      "p95_ms": 2.86,
+      "min_ms": 2.004,
+      "max_ms": 2.86,
       "n": 20
     },
     "warp_affine": {
-      "median_ms": 4.408,
-      "p95_ms": 5.548,
-      "min_ms": 3.666,
-      "max_ms": 5.548,
+      "median_ms": 4.101,
+      "p95_ms": 7.549,
+      "min_ms": 3.194,
+      "max_ms": 7.549,
       "n": 20
     },
     "adaptive_threshold": {
-      "median_ms": 10.162,
-      "p95_ms": 12.091,
-      "min_ms": 9.365,
-      "max_ms": 12.091,
+      "median_ms": 11.156,
+      "p95_ms": 14.685,
+      "min_ms": 9.485,
+      "max_ms": 14.685,
       "n": 20
     },
     "find_contours": {
-      "median_ms": 16.296,
-      "p95_ms": 21.87,
-      "min_ms": 14.647,
-      "max_ms": 21.87,
+      "median_ms": 15.696,
+      "p95_ms": 18.299,
+      "min_ms": 14.582,
+      "max_ms": 18.299,
       "n": 20
     },
     "cvt_gray": {
-      "median_ms": 1.876,
-      "p95_ms": 2.428,
-      "min_ms": 1.534,
-      "max_ms": 2.428,
+      "median_ms": 2.146,
+      "p95_ms": 3.315,
+      "min_ms": 1.345,
+      "max_ms": 3.315,
       "n": 20
     },
     "cvt_hsv": {
-      "median_ms": 2.722,
-      "p95_ms": 4.112,
-      "min_ms": 1.829,
-      "max_ms": 4.112,
+      "median_ms": 2.601,
+      "p95_ms": 4.071,
+      "min_ms": 1.96,
+      "max_ms": 4.071,
       "n": 20
     },
     "gaussian_blur": {
-      "median_ms": 3.293,
-      "p95_ms": 3.739,
-      "min_ms": 2.985,
-      "max_ms": 3.739,
+      "median_ms": 3.998,
+      "p95_ms": 10.874,
+      "min_ms": 2.682,
+      "max_ms": 10.874,
       "n": 20
     },
     "absdiff": {
-      "median_ms": 2.966,
-      "p95_ms": 5.155,
-      "min_ms": 2.031,
-      "max_ms": 5.155,
+      "median_ms": 6.51,
+      "p95_ms": 7.414,
+      "min_ms": 5.311,
+      "max_ms": 7.414,
       "n": 20
     },
     "morphology": {
-      "median_ms": 4.135,
-      "p95_ms": 6.221,
-      "min_ms": 2.618,
-      "max_ms": 6.221,
+      "median_ms": 7.47,
+      "p95_ms": 8.611,
+      "min_ms": 6.143,
+      "max_ms": 8.611,
       "n": 20
     }
   },
   "full_scan": {
     "backend_requested": "auto",
     "backend_resolved": "neural-lightglue",
-    "median_wall_ms": 16906.2,
-    "p95_wall_ms": 17025.3,
-    "scans_per_hour": 212.9,
+    "median_wall_ms": 14347.9,
+    "p95_wall_ms": 14823.9,
+    "scans_per_hour": 250.9,
     "stage_median_ms": {
-      "extract_baseline_ms": 1980.9,
-      "extract_rescan_ms": 1894.9,
-      "match_ms": 5835.6,
-      "register_ms": 9.7,
-      "diff_ms": 1363.3,
-      "events_ms": 61.0,
-      "total_ms": 16587.2
+      "extract_baseline_ms": 1722.5,
+      "extract_rescan_ms": 1528.3,
+      "match_ms": 5232.5,
+      "register_ms": 13.1,
+      "diff_ms": 1420.4,
+      "events_ms": 52.0,
+      "total_ms": 13953.0
     },
     "runs": [
       {
-        "wall_ms": 16906.2,
-        "extract_baseline_ms": 2002.9,
-        "extract_rescan_ms": 1727.4,
-        "match_ms": 5835.6,
-        "register_ms": 8.7,
-        "diff_ms": 1363.3,
-        "events_ms": 66.3,
-        "total_ms": 16587.2
+        "wall_ms": 14823.9,
+        "extract_baseline_ms": 1825.0,
+        "extract_rescan_ms": 1552.4,
+        "match_ms": 5232.5,
+        "register_ms": 57.5,
+        "diff_ms": 1468.1,
+        "events_ms": 77.9,
+        "total_ms": 14429.1
       },
       {
-        "wall_ms": 17025.3,
-        "extract_baseline_ms": 1980.9,
-        "extract_rescan_ms": 1956.5,
-        "match_ms": 6038.1,
-        "register_ms": 12.7,
-        "diff_ms": 1314.1,
-        "events_ms": 54.5,
-        "total_ms": 16719.2
+        "wall_ms": 14347.9,
+        "extract_baseline_ms": 1722.5,
+        "extract_rescan_ms": 1528.3,
+        "match_ms": 5145.4,
+        "register_ms": 13.1,
+        "diff_ms": 1345.8,
+        "events_ms": 52.0,
+        "total_ms": 13953.0
       },
       {
-        "wall_ms": 16517.8,
-        "extract_baseline_ms": 1918.3,
-        "extract_rescan_ms": 1894.9,
-        "match_ms": 5592.8,
-        "register_ms": 9.7,
-        "diff_ms": 1520.7,
-        "events_ms": 61.0,
-        "total_ms": 16202.9
+        "wall_ms": 14321.5,
+        "extract_baseline_ms": 1712.8,
+        "extract_rescan_ms": 1513.1,
+        "match_ms": 5237.9,
+        "register_ms": 11.0,
+        "diff_ms": 1420.4,
+        "events_ms": 45.6,
+        "total_ms": 13920.8
       }
     ]
   },
   "cost": {
     "instance": "c7i.xlarge",
     "hourly_usd": 0.1785,
-    "usd_per_1000_scans": 0.8383
+    "usd_per_1000_scans": 0.7114
   },
-  "timestamp": "2026-10-19T11:00:22Z"
+  "timestamp": "2026-10-19T11:20:43Z"
 }

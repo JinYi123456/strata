@@ -66,6 +66,22 @@ def timed(fn, repeat: int, warmup: int = 1) -> dict[str, float]:
     }
 
 
+def _cv2_provenance() -> str:
+    """Where cv2 was loaded from, with the machine's directory layout removed.
+
+    Which build of OpenCV a number came from is essential provenance - a COOL
+    build and an upstream build are not comparable. The absolute path it happens
+    to sit at is not, and recording it publishes the layout of whoever ran the
+    benchmark. Keep the part that identifies the build; drop the rest.
+    """
+    path = cv2.__file__ or ""
+    for marker in ("site-packages", "dist-packages"):
+        idx = path.find(marker)
+        if idx >= 0:
+            return path[idx:].replace("\\", "/")
+    return os.path.basename(path)
+
+
 def machine() -> dict[str, object]:
     """Identify the host well enough to make two runs comparable."""
     model = ""
@@ -86,7 +102,7 @@ def machine() -> dict[str, object]:
         "python": platform.python_version(),
         "opencv": cv2.__version__,
         "opencv_build": os.environ.get("STRATA_COOL_VERSION", "upstream"),
-        "cv2_module": cv2.__file__,
+        "cv2_module": _cv2_provenance(),
     }
 
 
