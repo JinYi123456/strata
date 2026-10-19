@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import time
 from dataclasses import replace
@@ -86,6 +87,20 @@ def build_config() -> PipelineConfig:
     )
 
 
+def _num(value: Any, ndigits: int = 3) -> float | None:
+    """A JSON-safe float.
+
+    ``inf`` and ``nan`` are not valid JSON, and a strict serialiser rejects the
+    whole payload because of one of them. They are also not numbers a caller can
+    use: an identity registration has no reprojection error at all, so the
+    honest encoding is null rather than a large sentinel. This is the same defect
+    the service hit — the one case that most needs a clean answer was the one
+    that broke — so it is handled at the boundary here too.
+    """
+    number = float(value)
+    return round(number, ndigits) if math.isfinite(number) else None
+
+
 def summarise(result: Any) -> dict[str, Any]:
     """Shape the scan into a JSON-safe payload.
 
@@ -99,19 +114,19 @@ def summarise(result: Any) -> dict[str, Any]:
             "model": reg.model,
             "inliers": int(reg.inlier_count),
             "matches": int(reg.match_count),
-            "inlier_ratio": round(float(reg.inlier_ratio), 4),
-            "reprojection_px": round(float(reg.reproj_error_px), 3),
-            "confidence": round(float(reg.confidence), 4),
+            "inlier_ratio": _num(reg.inlier_ratio, 4),
+            "reprojection_px": _num(reg.reproj_error_px),
+            "confidence": _num(reg.confidence, 4),
             "notes": list(reg.notes),
         },
         "events": [
             {
                 "kind": e.kind,
-                "confidence": round(float(e.confidence), 4),
+                "confidence": _num(e.confidence, 4),
                 "box": [int(v) for v in e.bbox],
                 "area_px": int(e.bbox[2]) * int(e.bbox[3]),
-                "displacement_px": round(float(e.displacement_px), 2),
-                "appearance_delta": round(float(e.appearance_delta), 3),
+                "displacement_px": _num(e.displacement_px, 2),
+                "appearance_delta": _num(e.appearance_delta),
                 "summary": e.summary,
             }
             for e in result.events
@@ -162,6 +177,8 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     payload["site_id"] = site_id
     payload["session_id"] = session_id
     payload["wall_ms"] = round((time.perf_counter() - started) * 1000.0, 1)
+    # Always present, so a caller can branch on it without a key check.
+    payload["recorded"] = False
 
     if event.get("record"):
         table = os.environ.get("STRATA_DDB_TABLE")

@@ -20,6 +20,17 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 COPY vision/ ${LAMBDA_TASK_ROOT}/
 COPY deploy/handler.py ${LAMBDA_TASK_ROOT}/handler.py
 
+# Feature weights are not committed. A build from a working copy carries them in
+# through the COPY above; a build from a fresh clone does not, and the pipeline
+# falls back to SIFT. Say which happened at build time rather than leaving it to
+# be discovered from a latency graph later — the handler also reports the
+# resolved backend in every response, so it is visible at runtime too.
+RUN if [ -d "${LAMBDA_TASK_ROOT}/models" ]; then \
+      echo "neural feature weights present"; \
+    else \
+      echo "no feature weights in the build context: the classical backend will be used"; \
+    fi
+
 # Warm the OpenCV import at image build time is not possible (it happens in the
 # runtime), so keep the handler's import path short and top-level: a cold start
 # pays for cv2 once and then reuses it for the life of the execution environment.

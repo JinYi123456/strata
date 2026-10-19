@@ -266,7 +266,9 @@ worse than none.
 
 **Verified in this build**
 
-- The full test suite passes (324 fast tests, plus the slow end-to-end set).
+- The full test suite passes: 327 fast tests and 71 end-to-end, including tests
+  for the Lambda handler itself (its event contract, its payload shape, and the
+  unregistrable-pair case that produces a non-finite number).
 - The service runs locally and serves the console and API on one port.
 - The evaluation reproduces its published figures exactly (0.665 px, P 0.9375,
   R 0.8542, F1 0.8875, 0 still-pair false positives).

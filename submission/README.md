@@ -20,7 +20,7 @@ required to start; the five sample sites are generated on first run.
    the slider compares *one place at two moments* rather than two photographs.
 4. Open **Changes**. Four events, each typed, located, measured and scored. One
    of them is at 47% confidence and the interface says so.
-5. Open **Coverage**. The system reports it only observed 36% of the frame well
+5. Open **Coverage**. The system reports it only observed 30% of the frame well
    enough to compare, and asks for a specific extra capture.
 6. Answer the gate at the bottom. Nothing is written until you do.
 
@@ -37,7 +37,7 @@ required to start; the five sample sites are generated on first run.
 | **Pinned dependencies** | `requirements.txt` (ranges) · `requirements.lock` (the measured set) |
 | **Build / deploy / test instructions** | [`README.md`](../README.md) · [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) |
 | **Demo video (≤5 min)** | [`service/static/media/strata-demo.mp4`](../service/static/media/strata-demo.mp4) |
-| **Evaluation evidence** | [`docs/TECHNICAL_REPORT.md`](../docs/TECHNICAL_REPORT.md) §7 · `scripts/evaluate.py` · `artifacts/eval/evaluation.json` |
+| **Evaluation evidence** | [`docs/TECHNICAL_REPORT.md`](../docs/TECHNICAL_REPORT.md) §7 · [`docs/evaluation.json`](../docs/evaluation.json) (the raw run) · `scripts/evaluate.py` (regenerate) |
 | **Failure cases and limitations** | Technical report §7.3 and §8 |
 | **Responsible-use considerations** | [`docs/RESPONSIBLE_USE.md`](../docs/RESPONSIBLE_USE.md) |
 | **Agent workflow and trace** | Technical report §5 · the trace panel in the app · `vision/strata_agent/` |

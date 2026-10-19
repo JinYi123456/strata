@@ -1,0 +1,1621 @@
+{
+  "config": {
+    "features": {
+      "backend": "auto",
+      "max_features": 4096,
+      "aliked_model": "aliked-n16rot-top2k-640.onnx",
+      "lightglue_model": "lightglue_for_aliked.onnx",
+      "model_dir": "models",
+      "sift_contrast_threshold": 0.02,
+      "sift_edge_threshold": 12.0,
+      "ratio_test": 0.75
+    },
+    "geometry": {
+      "ransac_confidence": 0.9999,
+      "ransac_max_iters": 10000,
+      "homography_reproj_threshold": 3.0,
+      "fundamental_reproj_threshold": 1.5,
+      "min_inlier_ratio": 0.25,
+      "min_inliers": 40,
+      "prefer_planar": true,
+      "canonical_long_edge": 1600,
+      "residual_good_px": 2.5,
+      "residual_poor_px": 6.0,
+      "low_structure_confidence_cap": 0.34
+    },
+    "diff": {
+      "clahe_clip_limit": 2.0,
+      "clahe_tile_grid": 8,
+      "blur_ksize": 5,
+      "noise_sigma_mult": 4.0,
+      "min_abs_delta": 26.0,
+      "strong_percentile": 94.0,
+      "max_threshold": 78.0,
+      "border_margin_px": 14,
+      "strong_margin": 14.0,
+      "local_gate_ksize": 9,
+      "chroma_sigma_mult": 3.0,
+      "min_chroma_delta": 6.0,
+      "chroma_open_ksize": 9,
+      "morph_open_ksize": 3,
+      "morph_close_ksize": 9,
+      "min_region_area_px": 420,
+      "max_region_fraction": 0.35,
+      "merge_fragments": true,
+      "merge_max_gap_px": 26,
+      "merge_max_area_ratio": 3.5,
+      "merge_polarity_min": 0.08,
+      "weak_evidence_ratio": 1.25,
+      "residual_good_px": 2.5,
+      "residual_poor_px": 6.0,
+      "min_confidence": 0.05
+    },
+    "coverage": {
+      "grid_rows": 8,
+      "grid_cols": 12,
+      "min_keypoints_per_cell": 6,
+      "confident_fraction": 0.72,
+      "weak_fraction": 0.45,
+      "max_frames": 240
+    },
+    "events": {
+      "presence_gap_min": 0.1,
+      "shift_match_min": 0.55,
+      "shift_advantage_min": 0.12,
+      "translation_min_px": 30.0,
+      "translation_max_px": 420.0,
+      "translation_size_ratio_min": 0.35,
+      "pair_arrival_gap_min": 0.02,
+      "pair_arrival_area_px": 1500.0,
+      "pair_scale_ratio_min": 0.25,
+      "translation_appearance_min": 0.62,
+      "min_confidence": 0.05,
+      "structure_ratio": 1.22
+    },
+    "seed": 20261026,
+    "executor": "baseline-local"
+  },
+  "params": {
+    "cases": 24,
+    "pose_strength": 1.0,
+    "objects": 18,
+    "mutations": 4,
+    "size": [
+      960,
+      720
+    ]
+  },
+  "aggregate": {
+    "cases": 24,
+    "mean_registration_error_px": 0.665,
+    "mean_registration_confidence": 0.9008,
+    "mean_precision": 0.9375,
+    "mean_recall": 0.8542,
+    "mean_f1": 0.8875,
+    "mean_event_kind_accuracy": 0.6979,
+    "total_false_positives": 6,
+    "total_false_negatives": 14,
+    "total_true_positives": 82
+  },
+  "still_pair": {
+    "pairs": 12,
+    "confident_false_positives_total": 0,
+    "confident_false_positives_per_pair": 0.0,
+    "per_seed": [
+      {
+        "seed": 2000,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9257
+      },
+      {
+        "seed": 2011,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9194
+      },
+      {
+        "seed": 2022,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9277
+      },
+      {
+        "seed": 2033,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9261
+      },
+      {
+        "seed": 2044,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9333
+      },
+      {
+        "seed": 2055,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9139
+      },
+      {
+        "seed": 2066,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9225
+      },
+      {
+        "seed": 2077,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9195
+      },
+      {
+        "seed": 2088,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9103
+      },
+      {
+        "seed": 2099,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9259
+      },
+      {
+        "seed": 2110,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9007
+      },
+      {
+        "seed": 2121,
+        "reported_events": 0,
+        "confident_false_positives": 0,
+        "registration_confidence": 0.9098
+      }
+    ]
+  },
+  "elapsed_seconds": 387.5,
+  "per_case": [
+    {
+      "name": "seed1000-pose1.00",
+      "registration_error_px": 0.455,
+      "registration_confidence": 0.9219,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9662,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0.75,
+        "recall": 0.75,
+        "f1": 0.75
+      },
+      "event_kind_accuracy": 0.75,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj11",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.974,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.988,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj13",
+          "expected_kind": "moved",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj15",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.924,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1007-pose1.00",
+      "registration_error_px": 1.31,
+      "registration_confidence": 0.8569,
+      "registration_model": "homography",
+      "inlier_ratio": 0.8778,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj17",
+          "expected_kind": "missing",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "state_changed",
+          "iou": 0.721,
+          "correct": false,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj10",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.987,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj15",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.95,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1014-pose1.00",
+      "registration_error_px": 1.367,
+      "registration_confidence": 0.8994,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9379,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj02",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.929,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.942,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj11",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.94,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj12",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.928,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1021-pose1.00",
+      "registration_error_px": 0.374,
+      "registration_confidence": 0.9244,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9727,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj15",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.695,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.92,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj16",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.942,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj17",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.925,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1028-pose1.00",
+      "registration_error_px": 0.308,
+      "registration_confidence": 0.9212,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9676,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj02",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.941,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.976,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj17",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.982,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj14",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.939,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1035-pose1.00",
+      "registration_error_px": 0.961,
+      "registration_confidence": 0.8886,
+      "registration_model": "homography",
+      "inlier_ratio": 0.927,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 2,
+        "false_negatives": 0,
+        "precision": 0.6667,
+        "recall": 1.0,
+        "f1": 0.8
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 6,
+      "per_event": [
+        {
+          "object_id": "obj14",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.936,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "state_changed",
+          "iou": 0.969,
+          "correct": false,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj08",
+          "expected_kind": "moved",
+          "reported_kind": "missing",
+          "iou": 0.957,
+          "correct": false,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj15",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.967,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1042-pose1.00",
+      "registration_error_px": 0.53,
+      "registration_confidence": 0.9164,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9647,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj13",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.927,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.928,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj10",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.94,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj15",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.395,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1049-pose1.00",
+      "registration_error_px": 0.435,
+      "registration_confidence": 0.9051,
+      "registration_model": "homography",
+      "inlier_ratio": 0.941,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj17",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.963,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.923,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj18",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.963,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj05",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.922,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1056-pose1.00",
+      "registration_error_px": 0.744,
+      "registration_confidence": 0.9071,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9511,
+      "detection": {
+        "true_positives": 2,
+        "false_positives": 1,
+        "false_negatives": 2,
+        "precision": 0.6667,
+        "recall": 0.5,
+        "f1": 0.5714
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj12",
+          "expected_kind": "missing",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.952,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj11",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.955,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj17",
+          "expected_kind": "state_changed",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1063-pose1.00",
+      "registration_error_px": 0.908,
+      "registration_confidence": 0.9099,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9554,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 0.75,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj17",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.932,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.942,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj08",
+          "expected_kind": "moved",
+          "reported_kind": "state_changed",
+          "iou": 0.3,
+          "correct": false,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj10",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.945,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1070-pose1.00",
+      "registration_error_px": 0.844,
+      "registration_confidence": 0.8928,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9314,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj18",
+          "expected_kind": "missing",
+          "reported_kind": "moved",
+          "iou": 0.944,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj12",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.895,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj06",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.926,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1077-pose1.00",
+      "registration_error_px": 0.549,
+      "registration_confidence": 0.9174,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9644,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.25,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj02",
+          "expected_kind": "missing",
+          "reported_kind": "moved",
+          "iou": 0.962,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj08",
+          "expected_kind": "moved",
+          "reported_kind": "state_changed",
+          "iou": 0.527,
+          "correct": false,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj03",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.944,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1084-pose1.00",
+      "registration_error_px": 0.272,
+      "registration_confidence": 0.9173,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9599,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj06",
+          "expected_kind": "missing",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "state_changed",
+          "iou": 0.296,
+          "correct": false,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj15",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.949,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj09",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.935,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1091-pose1.00",
+      "registration_error_px": 1.033,
+      "registration_confidence": 0.8901,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9234,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj07",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.935,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.98,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj12",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.953,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj13",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.921,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1098-pose1.00",
+      "registration_error_px": 0.805,
+      "registration_confidence": 0.9155,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9604,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj18",
+          "expected_kind": "missing",
+          "reported_kind": "moved",
+          "iou": 0.948,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj02",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.465,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj11",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.905,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1105-pose1.00",
+      "registration_error_px": 0.138,
+      "registration_confidence": 0.9255,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9727,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj16",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.984,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.942,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj02",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.961,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj13",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.934,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1112-pose1.00",
+      "registration_error_px": 0.679,
+      "registration_confidence": 0.8657,
+      "registration_model": "homography",
+      "inlier_ratio": 0.8788,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.25,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj15",
+          "expected_kind": "missing",
+          "reported_kind": "moved",
+          "iou": 0.951,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.968,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj14",
+          "expected_kind": "moved",
+          "reported_kind": "state_changed",
+          "iou": 0.376,
+          "correct": false,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj09",
+          "expected_kind": "state_changed",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1119-pose1.00",
+      "registration_error_px": 0.794,
+      "registration_confidence": 0.8991,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9393,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.25,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj14",
+          "expected_kind": "missing",
+          "reported_kind": "state_changed",
+          "iou": 0.957,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj17",
+          "expected_kind": "moved",
+          "reported_kind": "state_changed",
+          "iou": 0.298,
+          "correct": false,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj08",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.938,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1126-pose1.00",
+      "registration_error_px": 0.876,
+      "registration_confidence": 0.8336,
+      "registration_model": "homography",
+      "inlier_ratio": 0.8298,
+      "detection": {
+        "true_positives": 2,
+        "false_positives": 1,
+        "false_negatives": 2,
+        "precision": 0.6667,
+        "recall": 0.5,
+        "f1": 0.5714
+      },
+      "event_kind_accuracy": 0.25,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj11",
+          "expected_kind": "missing",
+          "reported_kind": "moved",
+          "iou": 0.951,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj04",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.978,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj09",
+          "expected_kind": "state_changed",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1133-pose1.00",
+      "registration_error_px": 0.331,
+      "registration_confidence": 0.9098,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9561,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0.75,
+        "recall": 0.75,
+        "f1": 0.75
+      },
+      "event_kind_accuracy": 0.75,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj03",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.966,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj12",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.962,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj10",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.944,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1140-pose1.00",
+      "registration_error_px": 0.592,
+      "registration_confidence": 0.8702,
+      "registration_model": "homography",
+      "inlier_ratio": 0.8853,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj07",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.97,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.959,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj13",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.969,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj01",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.943,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1147-pose1.00",
+      "registration_error_px": 0.516,
+      "registration_confidence": 0.8963,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9343,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj02",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.961,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.918,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj01",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.953,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj18",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.924,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1154-pose1.00",
+      "registration_error_px": 0.713,
+      "registration_confidence": 0.9147,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9548,
+      "detection": {
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571
+      },
+      "event_kind_accuracy": 0.5,
+      "expected_events": 4,
+      "reported_events": 3,
+      "per_event": [
+        {
+          "object_id": "obj16",
+          "expected_kind": "missing",
+          "reported_kind": "state_changed",
+          "iou": 0.294,
+          "correct": false,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": null,
+          "iou": 0.0,
+          "correct": false
+        },
+        {
+          "object_id": "obj05",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.946,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj15",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.956,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "seed1161-pose1.00",
+      "registration_error_px": 0.423,
+      "registration_confidence": 0.9199,
+      "registration_model": "homography",
+      "inlier_ratio": 0.9639,
+      "detection": {
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "event_kind_accuracy": 1.0,
+      "expected_events": 4,
+      "reported_events": 4,
+      "per_event": [
+        {
+          "object_id": "obj18",
+          "expected_kind": "missing",
+          "reported_kind": "missing",
+          "iou": 0.933,
+          "correct": true,
+          "accepted": [
+            "missing"
+          ]
+        },
+        {
+          "object_id": "new02",
+          "expected_kind": "added",
+          "reported_kind": "added",
+          "iou": 0.931,
+          "correct": true,
+          "accepted": [
+            "added",
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj13",
+          "expected_kind": "moved",
+          "reported_kind": "moved",
+          "iou": 0.952,
+          "correct": true,
+          "accepted": [
+            "moved"
+          ]
+        },
+        {
+          "object_id": "obj09",
+          "expected_kind": "state_changed",
+          "reported_kind": "state_changed",
+          "iou": 0.928,
+          "correct": true,
+          "accepted": [
+            "state_changed"
+          ]
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

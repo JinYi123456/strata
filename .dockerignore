@@ -26,7 +26,7 @@ __pycache__
 *.pem
 *.key
 
-# Tooling markers.
-.wbapp_*.genie
-.workbuddy
-.workbuddy-ai
+# Hidden local state — editor caches, workspace metadata, agent markers. None of
+# it exists in a fresh clone, but a local `docker build` should not pick it up.
+.*
+!.dockerignore

@@ -255,7 +255,11 @@ vision/
 service/             the HTTP API, session lifecycle, and the bundled console
 web/                 the console source (TypeScript, Next.js, Tailwind)
 scripts/             evaluation, model fetch, serving, console build, verification
-tests/               350+ tests, fast by default, `-m slow` for end-to-end
+tests/               398 tests: 327 fast, 71 end-to-end behind `-m slow`
+deploy/              arm64 Lambda container, deploy + teardown, COOL benchmark
+docs/                technical report, architecture, deployment, responsible use
+submission/          review guide: where everything lives
+Dockerfile           portable image for any container host
 ```
 
 ### Tests
