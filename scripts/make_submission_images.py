@@ -1,6 +1,8 @@
 """Generate the submission images Devpost actually accepts.
 
-Devpost's gallery renders at 3:2 and its project thumbnail at 16:9. The
+Devpost renders both its project gallery and its project thumbnail at 3:2
+(the form says so: "For best results, use a 3:2 ratio"), so nothing here is
+cropped to fit a ratio the platform will not show. The
 screenshots in ``docs/screenshots/`` are 1600x1000 (1.60) because that is what
 the console's own verification script captures, and the platform will crop them
 wherever it likes - which is how a screenshot of a dense dashboard loses the
@@ -20,18 +22,34 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# One source for the palette and the letter-spaced text helper. Duplicating them
+# across the film and the stills is how a brand colour ends up meaning two
+# different things in two files.
+from build_video import (  # noqa: E402
+    ACCENT,
+    ACCENT_BRIGHT,
+    EDGE,
+    GROUND,
+    INK,
+    INK_FAINT,
+    INK_MUTED,
+    RAISED,
+    _rule,
+    _text,
+)
 SRC = ROOT / "docs" / "screenshots"
 OUT = ROOT / "submission" / "gallery"
 
 GALLERY_RATIO = 3 / 2          # 1500x1000 from a 1600x1000 source
-THUMBNAIL_SIZE = (1280, 720)   # 16:9, Devpost's project thumbnail
+THUMBNAIL_SIZE = (1200, 800)   # 3:2 — what Devpost's thumbnail field asks for
 
 # The screenshots are dense dashboards with the change-set panel against the
 # right edge and the approval gate at the bottom, so they are padded to 3:2
 # rather than cropped: 100 columns off each side would take the confidence
 # numbers with them. The pad colour is the console's own ground, so the padding
 # is invisible against the interface.
-GROUND = "#080B0F"
 SHOTS = ("01-sites.png", "02-scan-result.png", "03-compare.png",
          "04-changes.png", "05-coverage.png", "06-gate.png")
 
@@ -47,6 +65,47 @@ def fit(image: Image.Image, size: tuple[int, int], background: str) -> Image.Ima
     canvas.paste(resized, ((size[0] - resized.width) // 2,
                            (size[1] - resized.height) // 2))
     return canvas
+
+
+def youtube_thumbnail(out: Path) -> Path:
+    """A thumbnail for YouTube, which wants 1280x720 and nothing else.
+
+    The Devpost thumbnail is 3:2; YouTube crops a 3:2 image to 16:9 and eats the
+    top and bottom of the type. So this is composed for the platform's own frame
+    rather than converted into it. It has to survive being 210 pixels wide in a
+    sidebar, which means one wordmark, one sentence, and one real screenshot -
+    not the whole product description.
+    """
+    size = (1280, 720)
+    img = Image.new("RGB", size, GROUND)
+    d = ImageDraw.Draw(img)
+    for x in range(0, size[0], 32):
+        d.line([(x, 0), (x, size[1])], fill=RAISED, width=1)
+    for y in range(0, size[1], 32):
+        d.line([(0, y), (size[0], y)], fill=RAISED, width=1)
+
+    shot = Image.open(SRC / "04-changes.png").convert("RGB")
+    scale = 470 / shot.width
+    shot = shot.resize((470, int(round(shot.height * scale))), Image.LANCZOS)
+    box = (size[0] - shot.width - 64, 64)
+    d.rectangle((box[0] - 3, box[1] - 3, box[0] + shot.width + 3, box[1] + shot.height + 3),
+                outline=EDGE, width=2)
+    img.paste(shot, box)
+
+    _text(d, (64, 150), "S T R A T A", size=76, fill=INK, role="sans_bold", tracking=9)
+    # Span the wordmark rather than a third of it, or the rule reads
+    # as an underline under one letter.
+    _rule(d, (66, 250), 500, fill=ACCENT)
+    _text(d, (64, 290), "Version control for", size=40, fill=INK_MUTED)
+    _text(d, (64, 340), "the physical world", size=40, fill=INK_MUTED)
+    _text(d, (64, 452), "OpenCV 5  +  AWS Graviton", size=28, role="mono_bold",
+          fill=ACCENT_BRIGHT)
+    _text(d, (64, 500), "Typed changes, measured, human-gated", size=24, fill=INK_FAINT)
+    _text(d, (64, 600), "OpenCV AI Competition 2026", size=22, role="mono",
+          fill=INK_FAINT)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, optimize=True)
+    return out
 
 
 def build() -> list[Path]:
@@ -89,6 +148,8 @@ def build() -> list[Path]:
         draw = ImageDraw.Draw(thumb)
         draw.rectangle((0, THUMBNAIL_SIZE[1] - 4, THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1]),
                        fill="#4FE3C1")
+    written.append(youtube_thumbnail(ROOT / "submission" / "youtube-thumbnail.png"))
+
     thumbnail = ROOT / "submission" / "thumbnail.png"
     thumb.save(thumbnail, optimize=True)
     written.append(thumbnail)
