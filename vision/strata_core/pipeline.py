@@ -85,6 +85,16 @@ class ScanResult:
     timings: StageTiming
     feature_backend: str
     config: PipelineConfig
+    # Which matcher actually produced this pair's correspondences. It is not
+    # always ``feature_backend``: the structure guard can divert a thin pair to
+    # the classical matcher, and a flat pair is refused outright. Reporting the
+    # resolved backend alone would attribute a measurement to a matcher that
+    # never ran.
+    match_backend: str = ""
+    config: PipelineConfig
+    # What each further frame of the second visit contributed to coverage, and
+    # why any of them did not. Empty unless extra frames were supplied.
+    extra_views: list[dict[str, Any]] = field(default_factory=list)
 
     # --- Derived views -------------------------------------------------
 
@@ -122,12 +132,14 @@ class ScanResult:
         return {
             "version": "1.0",
             "feature_backend": self.feature_backend,
+            "match_backend": self.match_backend,
             "executor": self.config.executor,
             "registration": self.registration.to_summary(),
             "diff": self.diff.to_summary(),
             "events": [e.to_dict() for e in self.events],
             "event_totals": self.event_totals,
             "coverage": coverage_summary(self.coverage, self.view_requests),
+            "extra_views": list(self.extra_views),
             "timings_ms": self.timings.to_dict(),
         }
 
@@ -159,13 +171,13 @@ def _fit_to(image: np.ndarray, size: tuple[int, int]) -> np.ndarray:
     return cv2.resize(image, (w, h), interpolation=interp)
 
 
-def _coverage_from_frames(
+def _coverage_accumulator(
     frames: list[np.ndarray],
     cfg: PipelineConfig,
     canonical_size: tuple[int, int],
     extractor,
-) -> tuple[CoverageMap, list[ViewRequest]]:
-    """Build a coverage map from one or more baseline frames.
+) -> CoverageAccumulator:
+    """Start a coverage map from one or more frames already in canonical space.
 
     Multi-frame coverage is what makes the guidance meaningful: a single frame
     sees part of the scene, and the union of several views sees more. The
@@ -177,10 +189,87 @@ def _coverage_from_frames(
         if frame.shape[:2] != (canonical_size[1], canonical_size[0]):
             frame = cv2.resize(frame, canonical_size, interpolation=cv2.INTER_AREA)
         gray = to_gray(frame)
-        feats = extractor.detect(gray)
-        acc.add_frame(gray, feats)
-    cmap = acc.build()
-    return cmap, view_requests(cmap, cfg.coverage)
+        acc.add_frame(gray, extractor.detect(gray))
+    return acc
+
+
+def _add_extra_views(
+    acc: CoverageAccumulator,
+    frames: list[np.ndarray],
+    base_features: FeatureSet,
+    base_shape: tuple[int, int],
+    canonical_size: tuple[int, int],
+    extractor,
+    matcher: Matcher,
+    cfg: PipelineConfig,
+) -> list[dict[str, Any]]:
+    """Register each further frame of the second visit, and credit what it saw.
+
+    This is what closes the perception loop. When the agent asks for another
+    capture because coverage is too thin, the frame it receives has to change
+    what the system knows it observed - otherwise "act" is theatre and the
+    coverage bar can never be met. Each extra view is matched against the
+    baseline, registered with the same estimator the primary frame uses, and
+    warped in; only its inlier correspondences are credited, because those are
+    the places where the view actually tells us something.
+
+    A view that cannot be registered is reported as attempted and discarded
+    rather than silently adding coverage: an unaligned frame makes a cell look
+    observed when nothing in it can be trusted.
+    """
+    reports: list[dict[str, Any]] = []
+    if not frames:
+        return reports
+
+    canon_w, canon_h = canonical_size
+    base_h, base_w = base_shape
+    scale = np.array([canon_w / float(base_w), canon_h / float(base_h)], dtype=np.float64)
+
+    for index, frame in enumerate(frames, start=2):
+        report: dict[str, Any] = {
+            "frame": index,
+            "registered": False,
+            "confidence": 0.0,
+            "inliers": 0,
+            "points_credited": 0,
+        }
+        try:
+            feats = extractor.detect(to_gray(frame))
+            matches = matcher.match(feats, base_features)
+            reg = register(
+                matches, src_shape=frame.shape[:2], dst_shape=base_shape, cfg=cfg.geometry
+            )
+        except Exception as exc:  # a bad view must not fail the whole scan
+            report["reason"] = f"could not be processed: {exc}"
+            reports.append(report)
+            continue
+
+        report["confidence"] = round(float(reg.confidence), 4)
+        report["backend"] = str(getattr(matches, "backend", "") or "")
+        mask = reg.inliers_mask
+        aligned = mask is not None and mask.shape[0] == len(matches) and bool(mask.any())
+        if reg.model == "identity" or not aligned:
+            report["reason"] = "no alignment found for this view"
+            reports.append(report)
+            continue
+        if reg.confidence < cfg.coverage.extra_view_min_confidence:
+            report["reason"] = (
+                f"registered at {reg.confidence:.2f}, below the "
+                f"{cfg.coverage.extra_view_min_confidence:.2f} bar for crediting coverage"
+            )
+            reports.append(report)
+            continue
+
+        warped, _valid = warp_to_canonical(frame, reg, canonical_size)
+        points = matches.dst_points[mask].astype(np.float64) * scale
+        acc.add_canonical_view(to_gray(warped), points.astype(np.float32))
+        report.update(
+            registered=True,
+            inliers=int(mask.sum()),
+            points_credited=int(len(points)),
+        )
+        reports.append(report)
+    return reports
 
 
 def run_scan(
@@ -260,7 +349,18 @@ def run_scan(
         cv2.resize(f, canonical_size, interpolation=cv2.INTER_AREA)
         for f in baseline_frames[1:]
     ]
-    cmap, requests = _coverage_from_frames(baseline_canonical, cfg, canonical_size, extractor)
+    accumulator = _coverage_accumulator(
+        baseline_canonical, cfg, canonical_size, extractor
+    )
+    # The second visit's further frames are registered in and counted too. This
+    # is the difference between an agent that can ask for another look and one
+    # that can only ask and ignore the answer.
+    extra_views = _add_extra_views(
+        accumulator, rescan_frames[1:], f_base, base0.shape[:2],
+        canonical_size, extractor, matcher, cfg,
+    )
+    cmap = accumulator.build()
+    requests = view_requests(cmap, cfg.coverage)
     timings.coverage_ms = (time.perf_counter() - t0) * 1000.0
 
     tick("diff", 0.80)
@@ -276,16 +376,12 @@ def run_scan(
         canon_base, canon_res, cfg.diff,
         residual=reg.residual_map, coverage_mask=gate, valid_mask=rescan_valid,
     )
-    diff_reverse = compute_diff(
-        canon_res, canon_base, cfg.diff,
-        residual=reg.residual_map, coverage_mask=gate, valid_mask=rescan_valid,
-    )
     timings.diff_ms = (time.perf_counter() - t0) * 1000.0
 
     tick("events", 0.92)
     t0 = time.perf_counter()
     events = resolve_events(
-        diff_forward, diff_reverse, cfg.events,
+        diff_forward, cfg.events,
         baseline_shape=canon_base.shape[:2],
         rescan_shape=canon_res.shape[:2],
         baseline_image=canon_base,
@@ -309,6 +405,8 @@ def run_scan(
         timings=timings,
         feature_backend=backend,
         config=cfg,
+        extra_views=extra_views,
+        match_backend=str(getattr(matches, "backend", "") or ""),
     )
 
 

@@ -143,6 +143,7 @@ def build_observation(
         uncertain_targets=_uncertain_targets(uncertain, weak, cmap),
         captures_used=int(captures_used),
         capture_budget=int(capture_budget),
+        views_credited=sum(1 for v in result.extra_views if v.get("registered")),
     )
 
 
@@ -278,6 +279,12 @@ def run_agent(
                 f"{len(result.events)} change(s) found; coverage "
                 f"{obs.observed_fraction * 100:.0f}% ({obs.coverage_status}); "
                 f"registration confidence {obs.registration_confidence:.2f}."
+                + (
+                    f" {obs.views_credited} further view(s) of this visit were "
+                    "registered in and credited as coverage."
+                    if obs.views_credited
+                    else ""
+                )
                 + ("" if rescanned else " Frames unchanged, so this is the previous result.")
             ),
             decided_by="pipeline",

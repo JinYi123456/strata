@@ -31,6 +31,7 @@ from strata_agent.policy import AgentConfig
 from strata_core.config import PipelineConfig
 
 from . import demo, encoding, runners
+from .observability import log_fields, scan_log_fields
 from .store import Store, StoreError
 
 log = logging.getLogger("strata.service.sessions")
@@ -281,6 +282,17 @@ class SessionManager:
 
         scan_index = session.scans
         self._persist_scan(session, scan_index, outcome, min_confidence)
+        # One structured line per scan, so "why did that take forty seconds" is
+        # answered by the log rather than by reproducing the run.
+        log_fields(
+            log,
+            "scan completed",
+            session_id=session_id,
+            site_id=session.site_id,
+            scan_index=scan_index,
+            outcome=str(outcome.run.outcome),
+            **scan_log_fields(outcome.result.to_summary() if outcome.has_result else {}),
+        )
 
         session.scans = scan_index + 1
         self.store.put_json(self._state_key(session_id), session.to_state())

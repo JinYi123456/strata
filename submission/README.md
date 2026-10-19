@@ -59,13 +59,17 @@ Expected, and reproduced exactly on the machine the figures were measured on:
 
 ```
 registration error      0.665 px mean corner error
-registration confidence 0.901
+registration confidence 0.9008
 precision               0.9375
 recall                  0.8542
 F1                      0.8875
 event-kind accuracy     0.6979
 still-pair false pos.   0.0   (12 unchanged pairs)
 ```
+
+`python scripts/figures.py` prints these from the committed run rather than from
+a copy, and `tests/test_docs_agree_with_artifact.py` fails if the documents stop
+matching it.
 
 The scenes are generated from seeds, so a difference in these numbers is a
 difference in the code, not in the data.
@@ -79,8 +83,8 @@ sections are the ones worth reading closely:
 
 - **Event-kind accuracy is 0.698** — locations are found far more reliably than
   they are labelled. The two numbers are reported separately rather than blended.
-- **Seven of 24 benchmark cases report 3 events where 4 are expected.** One
-  change is merged away. Documented and pinned by a test.
+- **Ten of 24 benchmark cases report fewer events than expected.** One change is
+  merged away. Documented and pinned by a test.
 - **No Arm-vs-x86 performance ratio is published**, because no Graviton instance
   was available to measure it. The harness that produces it is in
   `deploy/benchmark/` and the protocol is in `docs/DEPLOYMENT.md` §3. Publishing

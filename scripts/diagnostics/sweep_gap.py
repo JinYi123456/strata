@@ -12,22 +12,14 @@ from strata_core.config import PipelineConfig
 from strata_core.pipeline import run_scan
 from strata_core.synth import make_scene
 from strata_core.evaluate import score_regions, score_event_kinds
-from evaluate import _scene_to_canonical_box, _rescan_to_canonical_box
+from truth import canonical_boxes, canonical_primary
 
 SEEDS = [1000, 1007, 1014, 1021, 1028, 1035, 1042, 1049]
 SIZE = (960, 720)
 
 
 def boxes(scene, canonical_size):
-    out = []
-    for gt in scene.ground_truth_events():
-        sp = gt.get("bbox_space", "baseline")
-        out.append(
-            _scene_to_canonical_box(gt["baseline_bbox"], SIZE, canonical_size)
-            if sp == "baseline"
-            else _rescan_to_canonical_box(gt["baseline_bbox"], scene, canonical_size)
-        )
-    return out
+    return canonical_boxes(scene, canonical_size)
 
 
 def run(gap_min: float, accept_displacement: float | None = None):
@@ -44,15 +36,7 @@ def run(gap_min: float, accept_displacement: float | None = None):
         cs = res.registration.canonical_size
         truth = boxes(scene, cs)
         m = score_regions([e.bbox for e in res.events], truth, iou_threshold=0.25)
-        primary = [g for g in scene.ground_truth_events() if g["kind"] != "moved_destination"]
-        ps = [
-            {**g, "baseline_bbox": list(
-                _scene_to_canonical_box(g["baseline_bbox"], SIZE, cs)
-                if g.get("bbox_space", "baseline") == "baseline"
-                else _rescan_to_canonical_box(g["baseline_bbox"], scene, cs)
-            )}
-            for g in primary
-        ]
+        ps = canonical_primary(scene, cs)
         k, _ = score_event_kinds([e.to_dict() for e in res.events], ps,
                                  iou_threshold=0.25, accepted_kinds={"added": ("moved",)})
         P += m.precision; R += m.recall; K += k; n += 1

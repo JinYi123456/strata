@@ -19,6 +19,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
+import math
+
 import cv2
 import numpy as np
 
@@ -126,6 +128,12 @@ def _sane_homography(H: np.ndarray) -> bool:
     return 1e-3 < span < 1e5
 
 
+def _px(value: float) -> str:
+    """A pixel error that reads well in a note, including the infinite case."""
+    v = float(value)
+    return "n/a" if not math.isfinite(v) else f"{v:.2f}px"
+
+
 def register(
     matches: MatchSet,
     *,
@@ -226,9 +234,16 @@ def register(
         matrix = H
         inliers = in_h
         err = err_h
-        if use_f and err_f < err_h * 0.8:
+        if not cfg.prefer_planar:
+            # Both models were estimated, so the comparison is recorded rather
+            # than dropped. "Why this model" is the question someone reading a
+            # registration actually asks, and an unexplained choice is the same
+            # black box this project exists to open.
+            qualified = "did not qualify" if not use_f else "was worse"
             note.append(
-                f"homography preferred (planar); fundamental err {err_f:.2f}px noted"
+                f"planar model chosen; fundamental {qualified} "
+                f"(homography {_px(err_h)} / inliers {ratio_h:.2f}; "
+                f"fundamental {_px(err_f)} / inliers {ratio_f:.2f})"
             )
     else:
         model = "fundamental"

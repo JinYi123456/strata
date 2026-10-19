@@ -66,6 +66,12 @@ class CoverageMap:
     observed_fraction: float = 0.0
     status: str = "unknown"          # observed | weak | unobserved
     frame_count: int = 0
+    # The denominator for per-cell keypoint quality. Frozen from the first frame
+    # accumulated, so that adding a view can only ever add evidence. Measuring
+    # each map against its own 90th percentile made quality relative to the
+    # busiest cell in that same map, which meant a second capture looking at a
+    # corner could *lower* the reported coverage of everything else.
+    kp_normaliser: float = 0.0
     # The canonical frame this grid covers. Carried explicitly so a consumer can
     # map a point in canonical pixels onto a cell without assuming a size - the
     # grid is resolution-independent, but the coordinates fed into it are not.
@@ -121,7 +127,8 @@ class CoverageMap:
         statement about whether the area was imaged - see :meth:`imaged_mask`.
         """
         kp = self.keypoint_counts.astype(np.float32)
-        kp_term = np.clip(kp / max(1.0, float(np.percentile(kp, 90) or 1.0)), 0.0, 1.0)
+        denominator = self.kp_normaliser or max(1.0, float(np.percentile(kp, 90) or 1.0))
+        kp_term = np.clip(kp / max(1.0, denominator), 0.0, 1.0)
         return np.clip(0.65 * kp_term + 0.35 * np.clip(self.texture_energy, 0.0, 1.0), 0.0, 1.0)
 
     def to_dict(self) -> dict:
@@ -166,6 +173,19 @@ class CoverageAccumulator:
         self.keypoint_counts = np.zeros((cfg.grid_rows, cfg.grid_cols), np.int32)
         self.texture_energy = np.zeros((cfg.grid_rows, cfg.grid_cols), np.float32)
         self.frame_count = 0
+        self.kp_normaliser = 0.0
+
+    def _freeze_normaliser(self) -> None:
+        """Anchor per-cell quality to the first view's busiest cell.
+
+        Taken once, from the reference frame. Recomputing it from each
+        accumulated map would let a later view raise the bar the earlier views
+        are measured against, which is how a second capture ended up reporting
+        *less* coverage than one.
+        """
+        if self.kp_normaliser:
+            return
+        self.kp_normaliser = max(1.0, float(np.percentile(self.keypoint_counts, 90) or 1.0))
 
     def add_frame(self, canonical_gray: np.ndarray, features: FeatureSet | None = None) -> None:
         """Accumulate evidence from one canonicalised frame."""
@@ -184,20 +204,50 @@ class CoverageAccumulator:
                     [w / float(sw), h / float(sh)], dtype=np.float32
                 )
             self._add_keypoints(pts, w, h)
+        self._freeze_normaliser()
+
+    def add_canonical_view(
+        self, canonical_gray: np.ndarray, points: np.ndarray | None = None
+    ) -> None:
+        """Accumulate a frame that is *already* in canonical coordinates.
+
+        :meth:`add_frame` scales feature points from the frame's own pixel space,
+        which is right for a baseline frame that was resized into the canonical
+        frame and wrong for a registered view whose correspondences have already
+        been mapped. This takes the points where they are.
+        """
+        if self.frame_count >= self.cfg.max_frames:
+            return
+        self.frame_count += 1
+        self._add_texture(canonical_gray)
+        if points is not None and len(points):
+            h, w = canonical_gray.shape[:2]
+            self._add_keypoints(np.asarray(points, dtype=np.float32), w, h)
+        self._freeze_normaliser()
 
     def _add_texture(self, gray: np.ndarray) -> None:
+        """Credit each cell with the best local contrast ever seen in it.
+
+        Max, not mean. Coverage answers "was any part of this place ever seen",
+        and a frame whose field of view did not reach a cell must not dilute the
+        evidence another frame left there. Averaging across frames made a second
+        capture *lower* the observed fraction, which is the exact opposite of
+        what asking for a second capture is for.
+        """
         h, w = gray.shape[:2]
         grad = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
         grad = np.abs(grad) + np.abs(cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3))
         rows = np.linspace(0, h, self.cfg.grid_rows + 1).astype(int)
         cols = np.linspace(0, w, self.cfg.grid_cols + 1).astype(int)
+        energy = np.zeros((self.cfg.grid_rows, self.cfg.grid_cols), np.float32)
         for r in range(self.cfg.grid_rows):
             for c in range(self.cfg.grid_cols):
                 cell = grad[rows[r]:rows[r + 1], cols[c]:cols[c + 1]]
                 if cell.size == 0:
                     continue
-                energy = float(np.mean(cell)) / 255.0
-                self.texture_energy[r, c] += np.clip(energy, 0.0, 1.0)
+                value = float(np.mean(cell)) / 255.0
+                energy[r, c] = np.clip(value, 0.0, 1.0)
+        self.texture_energy = np.maximum(self.texture_energy, energy)
 
     def _add_keypoints(self, pts: np.ndarray, w: int, h: int) -> None:
         if pts.size == 0:
@@ -209,17 +259,14 @@ class CoverageAccumulator:
 
     def build(self) -> CoverageMap:
         """Finalise the accumulated evidence into a coverage map."""
-        if self.frame_count > 1:
-            texture = self.texture_energy / float(self.frame_count)
-        else:
-            texture = self.texture_energy
         cmap = CoverageMap(
             rows=self.cfg.grid_rows,
             cols=self.cfg.grid_cols,
             keypoint_counts=self.keypoint_counts,
-            texture_energy=np.clip(texture, 0.0, 1.0),
+            texture_energy=np.clip(self.texture_energy, 0.0, 1.0),
             frame_count=self.frame_count,
             canonical_size=self.canonical_size,
+            kp_normaliser=self.kp_normaliser,
         )
         cmap.observed_fraction = self._observed_fraction(cmap)
         cmap.status = _status_for(cmap.observed_fraction, self.cfg)

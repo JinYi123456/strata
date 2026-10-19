@@ -120,33 +120,52 @@ def microbenchmarks(size: tuple[int, int], repeat: int) -> dict[str, dict[str, f
                       tuple(int(v) for v in rng.integers(0, 255, 3)), -1)
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    other = np.roll(frame, 3, axis=1)          # a second visit, same colour space
     small = cv2.resize(gray, (w // 2, h // 2))
     warp = cv2.getRotationMatrix2D((w / 2, h / 2), 0.8, 1.01)
     warp = np.vstack([warp, [0, 0, 1]])
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    points = rng.random((2000, 1, 2)).astype(np.float32) * [w, h]
 
     def contours_op() -> None:
+        # The pipeline's own path: a mask built from a calibrated difference,
+        # cleaned with morphology, then external contours. Otsu stands in for
+        # the calibration because the calibration is numpy, not OpenCV.
         _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        th = cv2.morphologyEx(th, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
         cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    def sobel_op() -> None:
+        gx = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3))
+        np.abs(gx + cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3))
 
     return {
         "resize_half": timed(lambda: cv2.resize(frame, (w // 2, h // 2)), repeat),
         "resize_2x": timed(lambda: cv2.resize(small, (w, h)), repeat),
-        "warp_affine": timed(lambda: cv2.warpPerspective(frame, warp, (w, h)), repeat),
-        "adaptive_threshold": timed(
-            lambda: cv2.adaptiveThreshold(
-                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5
-            ),
-            repeat,
+        "warp_perspective": timed(lambda: cv2.warpPerspective(frame, warp, (w, h)), repeat),
+        "perspective_transform": timed(
+            lambda: cv2.perspectiveTransform(points, warp), repeat
         ),
         "find_contours": timed(contours_op, repeat),
+        "sobel_gradient": timed(sobel_op, repeat),
         "cvt_gray": timed(lambda: cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), repeat),
         "cvt_hsv": timed(lambda: cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), repeat),
         "gaussian_blur": timed(lambda: cv2.GaussianBlur(frame, (5, 5), 0), repeat),
-        "absdiff": timed(lambda: cv2.absdiff(frame, hsv), repeat),
+        "absdiff": timed(lambda: cv2.absdiff(frame, other), repeat),
         "morphology": timed(
             lambda: cv2.morphologyEx(
                 gray, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8)
+            ),
+            repeat,
+        ),
+        # Not in this pipeline's hot path. The difference is thresholded with a
+        # per-pair robust calibration in numpy (see strata_core.diff), not with
+        # cv2.adaptiveThreshold. It is measured anyway because it is one of the
+        # primitives a cloud-optimised build names as accelerated, so it shows
+        # what the build does to a kernel this project happens not to call -
+        # which is the honest way to report a null result.
+        "adaptive_threshold_reference": timed(
+            lambda: cv2.adaptiveThreshold(
+                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5
             ),
             repeat,
         ),

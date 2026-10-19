@@ -179,6 +179,11 @@ class CoverageConfig:
     weak_fraction: float = 0.45
     # Frames sampled per session for coverage accumulation.
     max_frames: int = 240
+    # An extra capture only counts as evidence when its own registration into the
+    # canonical frame clears this. Below it, the view is recorded as attempted and
+    # discarded rather than credited, because a badly-registered frame makes a
+    # cell look observed when nothing in it can be trusted.
+    extra_view_min_confidence: float = 0.35
 
 
 @dataclass(frozen=True)

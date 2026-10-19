@@ -199,3 +199,70 @@ def test_record_writes_one_ledger_row(mod, monkeypatch):
     assert payload["ok"] is True
     assert payload["site_id"] == "bay-4"
     assert len(payload["events"]) == len(result["events"])
+
+
+# --------------------------------------------------------------------------
+# Fast paths: the observability surface, without running a scan
+# --------------------------------------------------------------------------
+
+_SCAN_PAYLOAD = {
+    "ok": True,
+    "site_id": "bay-4",
+    "session_id": "s-1",
+    "backend": "neural-lightglue",
+    "match_backend": "classic-lowstructure",
+    "wall_ms": 14210.4,
+    "events": [{"kind": "added"}, {"kind": "missing"}],
+    "registration": {"model": "homography", "confidence": 0.91},
+    "coverage": {"observed_fraction": 0.3},
+    "timings_ms": {"extract_baseline_ms": 1500.0, "match_ms": 5200.0,
+                   "diff_ms": 1900.0, "total_ms": 14000.0},
+}
+
+
+def test_the_log_line_is_one_parseable_json_object(mod):
+    line = mod.log_line(_SCAN_PAYLOAD)
+    assert "\n" not in line
+    record = json.loads(line)
+    assert record["event"] == "scan" and record["ok"] is True
+    assert record["site_id"] == "bay-4"
+    # The distinction the report depends on: which matcher was resolved, and
+    # which one actually ran.
+    assert record["backend"] == "neural-lightglue"
+    assert record["match_backend"] == "classic-lowstructure"
+    assert record["stage_ms"] == {"extract_baseline_ms": 1500.0, "match_ms": 5200.0,
+                                  "diff_ms": 1900.0}
+    assert record["wall_ms"] == 14210.4
+
+
+def test_a_failed_scan_logs_at_error_level_with_its_reason(mod):
+    line = mod.log_line({"ok": False, "error": "unregistrable", "site_id": "x"})
+    record = json.loads(line)
+    assert record["level"] == "ERROR"
+    assert record["error"] == "unregistrable"
+
+
+def test_metrics_cover_the_whole_duration_and_each_stage(mod):
+    points = mod.metric_datapoints(_SCAN_PAYLOAD)
+    names = {p["MetricName"] for p in points}
+    assert "ScanDuration" in names and "ChangeEvents" in names
+    assert {"Stage.extract_baseline", "Stage.match", "Stage.diff"} <= names
+    duration = next(p for p in points if p["MetricName"] == "ScanDuration")
+    assert duration["Value"] == 14210.4 and duration["Unit"] == "Milliseconds"
+    events = next(p for p in points if p["MetricName"] == "ChangeEvents")
+    assert events["Value"] == 2
+    assert all(p["Dimensions"] == [{"Name": "SiteId", "Value": "bay-4"}] for p in points)
+
+
+def test_a_failed_scan_emits_no_metrics(mod):
+    assert mod.metric_datapoints({"ok": False, "error": "bad_request"}) == []
+
+
+def test_metrics_are_chunked_to_the_service_limit(mod):
+    payload = dict(_SCAN_PAYLOAD)
+    payload["timings_ms"] = {f"stage_{i}_ms": float(i) for i in range(40)}
+    payload["timings_ms"]["total_ms"] = 1.0
+    points = mod.metric_datapoints(payload)
+    assert len(points) > 20
+    chunks = [points[i:i + 20] for i in range(0, len(points), 20)]
+    assert all(len(c) <= 20 for c in chunks)

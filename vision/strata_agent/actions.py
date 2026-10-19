@@ -122,6 +122,11 @@ class Observation:
     # Budget - how many more captures may be requested?
     captures_used: int = 0
     capture_budget: int = 3
+    # How many of the captures this visit received were actually registered into
+    # the canonical frame and credited as coverage. This is the number that proves
+    # asking for another look changed what the system knows; a loop that asks and
+    # ignores the answer reports zero here forever.
+    views_credited: int = 0
 
     @property
     def budget_remaining(self) -> int:
@@ -149,6 +154,7 @@ class Observation:
             "captures_used": int(self.captures_used),
             "capture_budget": int(self.capture_budget),
             "budget_remaining": int(self.budget_remaining),
+            "views_credited": int(self.views_credited),
         }
 
 

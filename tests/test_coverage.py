@@ -230,3 +230,60 @@ class TestHeatmapRendering:
         """
         cmap = _accumulate([_textured()])
         assert cmap.heatmap().shape[:2] == (cmap.rows, cmap.cols)
+
+
+class TestAccumulationIsAUnion:
+    """A second look must never make the first look appear worse.
+
+    Cell texture used to be averaged across frames, so a frame whose field of
+    view did not reach a cell diluted the evidence another frame left there. The
+    observed fraction therefore went *down* when the agent asked for another
+    capture - the one behaviour the capture loop cannot survive.
+    """
+
+    def test_a_flatter_second_frame_cannot_lower_any_cell(self):
+        acc = CoverageAccumulator(CFG, CANONICAL)
+        strong = cv2.resize(_textured(), CANONICAL, interpolation=cv2.INTER_AREA)
+        acc.add_frame(strong, None)
+        one = acc.build()
+        after_one = one.texture_energy.copy()
+
+        flat = cv2.resize(
+            np.full((600, 800), 40, np.uint8), CANONICAL, interpolation=cv2.INTER_AREA
+        )
+        acc.add_frame(flat, None)
+        two = acc.build()
+        assert np.all(two.texture_energy >= after_one - 1e-6)
+        assert two.observed_fraction >= one.observed_fraction
+
+    def test_observed_fraction_is_monotonic_across_views(self):
+        acc = CoverageAccumulator(CFG, CANONICAL)
+        best = 0.0
+        for frame in (
+            _textured(seed=1),
+            _textured(seed=2),
+            np.full((600, 800), 30, np.uint8),
+            _textured(seed=3),
+        ):
+            acc.add_frame(cv2.resize(frame, CANONICAL, interpolation=cv2.INTER_AREA), None)
+            fraction = acc.build().observed_fraction
+            assert fraction >= best, "adding a view reduced coverage"
+            best = fraction
+
+    def test_frame_count_counts_every_view_credited(self):
+        acc = CoverageAccumulator(CFG, CANONICAL)
+        for frame in (_textured(seed=1), _textured(seed=2)):
+            acc.add_frame(cv2.resize(frame, CANONICAL, interpolation=cv2.INTER_AREA), None)
+        cmap = acc.build()
+        assert cmap.frame_count == 2
+
+    def test_a_canonical_view_takes_points_where_they_are(self):
+        """add_canonical_view must not rescale points that are already canonical."""
+        acc = CoverageAccumulator(CFG, CANONICAL)
+        gray = np.zeros((CANONICAL[1], CANONICAL[0]), np.uint8)
+        # Top-left cell only, in canonical coordinates.
+        points = np.array([[10.0, 10.0], [20.0, 15.0]], dtype=np.float32)
+        acc.add_canonical_view(gray, points)
+        cmap = acc.build()
+        assert cmap.keypoint_counts[0, 0] == 2
+        assert int(cmap.keypoint_counts.sum()) == 2

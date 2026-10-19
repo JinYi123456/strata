@@ -110,6 +110,11 @@ def summarise(result: Any) -> dict[str, Any]:
     reg = result.registration
     return {
         "backend": result.feature_backend,
+        # Which matcher actually ran. A pair diverted to the classical path by
+        # the structure guard still reports the neural extractor, so without
+        # this a latency or accuracy number could be attributed to a matcher
+        # that was never called.
+        "match_backend": result.match_backend,
         "registration": {
             "model": reg.model,
             "inliers": int(reg.inlier_count),
@@ -151,6 +156,95 @@ def ledger_row(
         "sk": f"{session_id}-{now_ms}.json",
         "doc": json.dumps(payload),
     }
+
+
+def log_line(payload: dict[str, Any]) -> str:
+    """One JSON line describing a completed scan.
+
+    The deployment document promises structured logs with per-stage timings, so
+    this is the thing that emits them. Numbers only: the change-set boxes are
+    already in the response and in the ledger row, and repeating them in the log
+    costs more to read than it is worth.
+    """
+    timings = payload.get("timings_ms") or {}
+    registration = payload.get("registration") or {}
+    coverage = payload.get("coverage") or {}
+    return json.dumps(
+        {
+            "ts": int(time.time()),
+            "level": "INFO" if payload.get("ok") else "ERROR",
+            "event": "scan",
+            "ok": bool(payload.get("ok")),
+            "site_id": payload.get("site_id"),
+            "session_id": payload.get("session_id"),
+            "error": payload.get("error"),
+            "backend": payload.get("backend"),
+            "match_backend": payload.get("match_backend"),
+            "event_count": len(payload.get("events") or []),
+            "registration_model": registration.get("model"),
+            "registration_confidence": registration.get("confidence"),
+            "observed_fraction": coverage.get("observed_fraction"),
+            "wall_ms": payload.get("wall_ms"),
+            "stage_ms": {
+                k: v for k, v in timings.items() if k.endswith("_ms") and k != "total_ms"
+            },
+        },
+        separators=(",", ":"),
+        default=str,
+    )
+
+
+def metric_datapoints(payload: dict[str, Any], *, namespace: str = "Strata") -> list[dict]:
+    """CloudWatch datapoints for one scan: the timings, as a graphable history.
+
+    The IAM policy deploy.sh writes has always granted ``PutMetricData``; this is
+    what spends it. Emission is opt-in because a metric costs money per data
+    point, and a demo account should not discover that on the invoice.
+    """
+    if not payload.get("ok"):
+        return []
+    timings = payload.get("timings_ms") or {}
+    dimensions = [{"Name": "SiteId", "Value": str(payload.get("site_id", "unknown"))}]
+    points = [
+        {
+            "MetricName": "ScanDuration",
+            "Dimensions": dimensions,
+            "Value": float(payload.get("wall_ms") or timings.get("total_ms") or 0.0),
+            "Unit": "Milliseconds",
+        },
+        {
+            "MetricName": "ChangeEvents",
+            "Dimensions": dimensions,
+            "Value": float(len(payload.get("events") or [])),
+            "Unit": "Count",
+        },
+    ]
+    for stage, value in timings.items():
+        if stage == "total_ms" or not isinstance(value, (int, float)):
+            continue
+        points.append(
+            {
+                "MetricName": f"Stage.{stage[:-3]}",
+                "Dimensions": dimensions,
+                "Value": float(value),
+                "Unit": "Milliseconds",
+            }
+        )
+    return points
+
+
+def emit_metrics(datapoints: list[dict], *, namespace: str = "Strata") -> str:
+    """Send the datapoints. Never raises: telemetry must not fail a scan."""
+    if not datapoints:
+        return "skipped"
+    try:
+        client = boto3.client("cloudwatch")
+        for chunk in (datapoints[i:i + 20] for i in range(0, len(datapoints), 20)):
+            client.put_metric_data(Namespace=namespace, MetricData=chunk)
+        return "sent"
+    except Exception as exc:  # pragma: no cover - network path
+        log.warning("metric emission failed: %s", exc)
+        return f"failed: {exc}"
 
 
 def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
@@ -216,5 +310,12 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
                 log.exception("ledger write failed")
                 payload["recorded"] = False
                 payload["record_error"] = str(exc)
+
+    # stdout rather than the logging module: in a Lambda container the logger
+    # prefixes each record with its own framing, and a JSON line that arrives
+    # wrapped in text is a JSON line nobody's metrics filter can read.
+    print(log_line(payload), flush=True)
+    if os.environ.get("STRATA_EMIT_METRICS") == "1":
+        payload["metrics"] = emit_metrics(metric_datapoints(payload))
 
     return payload

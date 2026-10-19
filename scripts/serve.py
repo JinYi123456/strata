@@ -77,6 +77,10 @@ def main() -> int:
     parser.add_argument("--log-level", default=os.environ.get("STRATA_LOG_LEVEL", "info"))
     args = parser.parse_args()
 
+    from service.observability import configure_logging
+
+    configure_logging()
+
     static_dir = _default_static_dir()
     if static_dir:
         os.environ["STRATA_STATIC_DIR"] = static_dir

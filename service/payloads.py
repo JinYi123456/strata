@@ -158,6 +158,8 @@ def build_rescan_response(
             scan_index=scan_index,
             outcome=str(outcome.run.outcome),
             feature_backend=str(result.feature_backend),
+            match_backend=str(result.match_backend),
+            extra_views=list(result.extra_views),
             registration=registration_out(outcome),
             events=[event_out(e, uncertain=e.event_id in uncertain) for e in shown],
             event_totals=totals,

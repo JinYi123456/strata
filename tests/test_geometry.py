@@ -22,6 +22,7 @@ from strata_core.geometry import (  # noqa: E402
     _mean_symmetric_error,
     _sane_homography,
     canonical_size_for,
+    register,
     render_canonical_baseline,
     warp_to_canonical,
 )
@@ -212,3 +213,71 @@ class TestGeometryConfigDefaults:
     def test_residual_thresholds_are_ordered(self):
         cfg = GeometryConfig()
         assert cfg.residual_good_px < cfg.residual_poor_px
+
+
+class TestModelSelection:
+    """The second geometric model, and when it is estimated at all.
+
+    ``prefer_planar`` ships as True, so the fundamental-matrix branch does not
+    run in a default scan and is not what the published benchmark measures. It
+    is not dead code - these tests turn it on - but it is honest to say the
+    benchmark exercises the planar path only.
+    """
+
+    @staticmethod
+    def _planar_matches(n: int = 300, seed: int = 4):
+        from strata_core.features import MatchSet
+
+        rng = np.random.default_rng(seed)
+        src = rng.random((n, 2)) * [900.0, 650.0]
+        H = np.array([[1.02, 0.01, 12.0], [0.0, 0.99, 8.0], [1e-6, 0.0, 1.0]])
+        dst = cv2.perspectiveTransform(src.astype(np.float32).reshape(-1, 1, 2), H)
+        dst = dst.reshape(-1, 2) + rng.normal(0, 0.4, (n, 2))
+        return MatchSet(
+            src_points=src.astype(np.float32),
+            dst_points=dst.astype(np.float32),
+            scores=np.ones(n, np.float32),
+            backend="test",
+        )
+
+    def test_the_default_estimates_the_planar_model_only(self):
+        matches = self._planar_matches()
+        reg = register(matches, src_shape=(700, 1000), dst_shape=(700, 1000),
+                       cfg=GeometryConfig())
+        assert reg.model == "homography"
+        assert reg.notes == []          # nothing was compared, so nothing to say
+
+    def test_turning_the_preference_off_compares_both_models(self):
+        matches = self._planar_matches()
+        cfg = GeometryConfig(prefer_planar=False)
+        reg = register(matches, src_shape=(700, 1000), dst_shape=(700, 1000), cfg=cfg)
+        assert reg.model in {"homography", "fundamental"}
+        # A planar-consistent set should still land on the homography, and the
+        # comparison is recorded rather than silently discarded.
+        assert reg.model == "homography"
+        assert any("fundamental" in note.lower() for note in reg.notes), reg.notes
+
+    def test_both_models_agree_on_a_planar_scene(self):
+        matches = self._planar_matches()
+        planar = register(matches, src_shape=(700, 1000), dst_shape=(700, 1000),
+                          cfg=GeometryConfig())
+        compared = register(matches, src_shape=(700, 1000), dst_shape=(700, 1000),
+                            cfg=GeometryConfig(prefer_planar=False))
+        assert planar.inlier_count == pytest.approx(compared.inlier_count, abs=8)
+        assert planar.confidence == pytest.approx(compared.confidence, abs=0.05)
+
+    def test_an_unregistrable_pair_records_why(self):
+        from strata_core.features import MatchSet
+
+        rng = np.random.default_rng(9)
+        n = 40
+        matches = MatchSet(
+            src_points=(rng.random((n, 2)) * 900).astype(np.float32),
+            dst_points=(rng.random((n, 2)) * 900).astype(np.float32),
+            scores=np.ones(n, np.float32),
+            backend="test",
+        )
+        reg = register(matches, src_shape=(700, 1000), dst_shape=(700, 1000),
+                       cfg=GeometryConfig(prefer_planar=False))
+        assert reg.model == "identity"
+        assert reg.notes, "the reason nothing registered should be recorded"

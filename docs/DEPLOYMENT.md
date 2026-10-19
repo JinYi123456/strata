@@ -96,11 +96,22 @@ Idempotent. It creates, or reuses if present:
 | Resource | Name | Notes |
 |---|---|---|
 | S3 bucket | `strata-sessions-<account>` | Private, AES-256, public access blocked |
-| DynamoDB table | `strata-ledger` | On-demand; `site_id` (HASH) + `session_id` (RANGE) |
+| DynamoDB table | `strata-ledger` | On-demand; `pk` (HASH) + `sk` (RANGE) |
 | ECR repository | `strata-vision` | Scan on push |
 | IAM role | `strata-lambda-role` | S3 + DynamoDB scoped to the two resources above |
 | Lambda function | `strata-vision` | **arm64**, container image, 3008 MB, 120 s |
+| Concurrency | reserved 5 | Bounds what one client can bill through an open Function URL |
 | Function URL | — | Public invocation endpoint |
+
+The `pk`/`sk` schema is the storage contract both writers use: `pk` is the
+parent of a record key, `sk` its leaf. `service/store.py` and
+`deploy/handler.py` write it, and `tests/contract.py` reads it back out of
+`deploy.sh` so the three cannot drift apart silently — which is exactly how this
+table was wrong before anything had ever been deployed.
+
+`./deploy/deploy.sh --dry-run` prints every command it would run and touches
+nothing, including the account lookup. It is the way to read the plan without
+credentials.
 
 The container is built for `linux/arm64` with `docker buildx`, so it can be built
 from an x86 machine:
@@ -129,6 +140,29 @@ aws lambda invoke --function-name strata-vision --region us-east-1 \
 
 Returns the change set with per-stage timings, and writes the ledger row when
 `record` is true.
+
+### Verify it, and keep the receipt
+
+`deploy/verify.py` is the step that turns "the scripts are complete" into "this
+ran on AWS". It uploads two real frames to the bucket, invokes the function over
+its URL, times the whole round trip from outside, reads the ledger row back out
+of DynamoDB, pulls the tail of the CloudWatch log, and writes all of it to a
+JSON report. It exits non-zero if the function is not arm64, if the scan
+reported no events for a scene with known changes, or if `record` was sent and
+no row appeared.
+
+```bash
+python deploy/verify.py --region us-east-1 \
+  --bucket strata-sessions-<account> --record \
+  --out deploy/verify-report.json
+
+# or with photographs instead of the seeded scene:
+python deploy/verify.py --region us-east-1 \
+  --bucket strata-sessions-<account> --frames path/to/photos --record
+```
+
+The report is a committed artefact once it exists, and it is the first thing a
+judge should ask for.
 
 ### Why Arm
 
@@ -202,7 +236,8 @@ python deploy/benchmark/compare.py \
 
 | Group | Operations | Why these |
 |---|---|---|
-| Microbenchmarks | resize (up and down), warpPerspective, adaptiveThreshold, findContours, cvtColor, GaussianBlur, absdiff, morphology | These are the pipeline's hot path **and** the operations a cloud-optimised build accelerates, so isolating them shows *where* a difference comes from rather than only that one exists |
+| Microbenchmarks | resize (up and down), warpPerspective, perspectiveTransform, findContours (with the morphology the pipeline runs before it), Sobel gradient, cvtColor to grey and to HSV, GaussianBlur, absdiff, morphology | These are the kernels the pipeline's own hot path calls, so isolating them shows *where* a difference comes from rather than only that one exists |
+| Reference op | adaptiveThreshold | Measured and labelled as **not in this pipeline's path** — the difference is thresholded by a NumPy robust calibration, not by this call. It is reported anyway because a cloud-optimised build names it among its accelerated kernels, and a null result is still a result |
 | Full scan | `run_scan` on a fixed seeded pair | The number a user experiences. This is the one to quote |
 
 Every timed section is preceded by a warm-up, and both median and p95 are
@@ -231,17 +266,29 @@ the measurement window. The instance terminates itself when it finishes.
 
 ## 4. Observability
 
-- **Structured logs** with per-stage timings, emitted by the pipeline and the
-  service.
+Three things emit, and each is checked by a test rather than asserted here:
+
+- **Structured logs.** `service/observability.py` writes one JSON object per
+  line to stdout, and the service logs one per completed scan with its
+  per-stage timings. `STRATA_LOG_FORMAT=text` switches to a readable format for
+  a terminal; JSON is the default because a log that has to be parsed by eye is
+  not a structured log. Secret-shaped fields (`api_key`, `authorization`,
+  `token`, …) are dropped to `[redacted]` — value as well as key — at the
+  formatter, so a mis-placed field cannot leak a model key into a log explorer.
+- **The Lambda writes the same line.** `deploy/handler.py:log_line()` prints one
+  JSON record per invocation to stdout, which is how CloudWatch receives it.
+- **CloudWatch metrics.** `metric_datapoints()` turns the timings into a
+  `ScanDuration`, a `ChangeEvents` count and one `Stage.<name>` metric per
+  stage. Emission is opt-in with `STRATA_EMIT_METRICS=1`, because a metric costs
+  money per data point and a grant account should not learn that from an
+  invoice. The IAM policy's `cloudwatch:PutMetricData` grant now has a caller.
 - **Agent trace** persisted with every run: what was observed, decided, why, by
   whom, and how long each step took.
-- **CloudWatch** receives function logs and can carry the timing fields as
-  custom metrics; the IAM policy already permits `cloudwatch:PutMetricData`.
-- **Benchmark JSON** is retained per run, so a performance regression is a diff
+- **Benchmark JSON** retained per run, so a performance regression is a diff
   rather than a memory.
 
-A production deployment therefore has a real answer to "why did this scan take
-forty seconds", and it is a measurement.
+A production deployment therefore has an answer to "why did this scan take forty
+seconds" that is a query, not a reproduction.
 
 ---
 

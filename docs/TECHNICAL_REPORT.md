@@ -178,10 +178,24 @@ and the appropriate one is selected:
 - **Fundamental matrix** plus a dense warp for scenes with real depth, where a
   homography would be a lie.
 
-The choice is not guessed from a threshold on inlier count alone. Both models
-are estimated, their symmetric epipolar and reprojection errors are compared,
-and the selection is recorded in a human-readable note attached to the
-registration — so a user can see *why* a model was chosen, not just which one.
+The choice is not guessed from a threshold on inlier count alone. When both
+models are estimated, their symmetric epipolar and reprojection errors are
+compared and the selection is recorded in a human-readable note attached to the
+registration, so a user can see *why* a model was chosen and not merely which
+one.
+
+**Which of those paths actually runs is configuration, and it is stated here
+because the default does not exercise both.** `GeometryConfig.prefer_planar`
+ships as `True`: the planar case is what a shelf, a wall or a bench actually is,
+it is the more accurate model when it applies, and estimating a fundamental
+matrix on every scan doubles the robust-fitting cost for scenes that will never
+use it. With the default, only the homography is estimated. All 24 benchmark
+cases were registered that way (`registration_model: "homography"`, no notes) —
+which means the published numbers describe the planar path, and the second model
+is covered by a dedicated test rather than by the benchmark. A scene with genuine
+depth structure, run with `prefer_planar=False`, is the obvious case the
+evaluation does not yet contain, and it is listed under limitations for that
+reason.
 
 **Confidence is calibrated, not decorative.** It combines inlier ratio,
 reprojection error, and inlier count. This matters because an early version
@@ -206,12 +220,25 @@ two captures of a cluttered bench have completely different noise floors. The
 difference threshold is therefore calibrated per pair from the observed
 distribution rather than fixed.
 
-The detection stage uses `cv2.adaptiveThreshold` on the normalised difference,
-morphological cleanup, and `cv2.findContours` to extract candidate regions.
-These are exactly the operations a cloud-optimised build accelerates — resize,
-adaptive Gaussian thresholding, and contour detection are named explicitly in
-the COOL optimisation set — which is why the benchmark in §7 exercises this
-stage rather than a synthetic microbenchmark.
+The detection stage thresholds the normalised difference at the level
+calibrated above, cleans it with `cv2.morphologyEx` open and close, and
+extracts candidate regions with `cv2.findContours`. The threshold itself is a
+vectorised comparison in NumPy, not `cv2.adaptiveThreshold` — the calibration is
+robust-statistical (median plus a scaled MAD per channel), and an adaptive local
+mean is a different estimator that would reintroduce exactly the dependence on
+neighbourhood contrast that the calibration exists to remove.
+
+The stages that dominate the running time are the resize that puts both visits
+on one grid, the `warpPerspective` that registers them, the Sobel gradients the
+coverage and presence measures run on, the colour conversions behind the
+chrominance channel, and the morphology and contour extraction. Those are the
+operations OpenCV 5 accelerates on AArch64 through the **KleidiCV** HAL
+(NEON/SVE/SME), with additional tuning in the COOL distribution, which is why
+the benchmark in §7 measures them on the pipeline's own frames.
+`cv2.adaptiveThreshold` is measured too, but labelled in the results as a
+reference op that this pipeline does not call — a cloud-optimised build names it
+among its accelerated kernels, and a null result on it is worth reporting rather
+than quietly omitting.
 
 **Fragment merging is polarity-aware.** A moved object leaves two adjacent
 regions of *opposite* polarity: the hole it vacated (darker in the rescan) and
@@ -265,6 +292,11 @@ much well-registered observation exists. Cells fall into bands (well observed,
 thin, unseen) and the bands drive `view_requests()`, which emits a small number
 of specific, actionable instructions.
 
+Accumulation across frames is a union, not an average: a cell keeps the best
+evidence any frame left in it, and quality is normalised against the reference
+view rather than against the current map. Both choices exist to make coverage
+monotone in evidence, which the agent's coverage bar depends on — see §5.
+
 The guidance is rendered as **intent** — a direction and a target on the
 baseline image — rather than a heat map dump. A heat map tells an operator that
 something is wrong; an arrow tells them where to point the phone.
@@ -297,6 +329,33 @@ exactly one call site, to justify *why* another view is wanted. If it fails — 
 key, rate limit, malformed JSON — the run degrades to the rules with the error
 recorded in the trace. Nothing in the product requires a model to be reachable,
 which is why the demo runs with no configuration at all.
+
+**A requested capture changes what the system observes.** This is the property
+that separates active perception from a scripted pipeline, and it did not hold
+until it was tested for: the scan consumed only the first frame of the second
+visit, so an extra capture appended by the agent could not alter the next
+observation, and the trace said "re-running the comparison" while re-running
+something identical. Every further frame of the second visit is now matched
+against the baseline, registered with the same estimator the primary frame uses,
+and warped into the canonical frame, where its inlier correspondences are
+credited to the coverage map. A view that will not register is reported as
+attempted and discarded rather than counted — an unaligned frame makes a cell
+look observed when nothing in it can be trusted.
+
+Two consequences worth stating because they were not obvious. Coverage now
+accumulates as a **union** rather than a mean: a frame that did not reach a cell
+must not dilute the evidence another frame left there, and averaging made a
+second capture *lower* the reported coverage. And per-cell quality is normalised
+against the first view's busiest cell rather than the current map's, because a
+relative denominator lets a later view raise the bar the earlier views are
+measured against — the same non-monotonicity from the other direction. With
+those two fixed, `observed_fraction` is monotone in the evidence, which is what
+makes the agent's 60% coverage bar reachable at all.
+
+The pipeline reports, per extra view, whether it registered, its confidence,
+which matcher ran, and how many points were credited (`extra_views` in the scan
+summary and in the API response), so the loop's effect is visible in the trace
+rather than inferred from a duration.
 
 **The trace is the product surface.** Every run emits what it observed, what it
 decided, why, who decided (rules, model, or human), and how long each step took.
@@ -375,6 +434,18 @@ ground truth and feeds them to the real scorers. Before the fix a perfect
 detector scored exactly P 1.000 / R 0.800. The pipeline's own 0.800 was already
 at the ceiling.
 
+The probe is reproducible, and shows both halves:
+
+```bash
+python scripts/oracle.py --cases 4                      # ceiling: 1.000 / 1.000
+python scripts/oracle.py --cases 4 --include-destinations   # the old cap: P 1.000 / R 0.800
+```
+
+It shares the coordinate conversion with the harness rather than re-deriving it.
+An earlier copy imported a helper that had been renamed away and failed at import
+time, which is how a methodology check stops being one — the reason
+`tests/test_docs_agree_with_artifact.py` now exists.
+
 **The benchmark was repeatedly found to disagree with its own ground truth.** A
 shared random stream meant removing one object changed every later object's
 rendered detail; tile writes near the frame edge were silently clipped; a
@@ -385,17 +456,34 @@ the test it was being judged by.
 
 ### 7.2 Results
 
+Every figure in this table is the mean over the 24 cases as recorded in
+`docs/evaluation.json`, at the artefact's own precision. `scripts/figures.py`
+regenerates them, and a test fails if the table stops matching the run.
+
 | Metric | Result |
 |---|---|
 | Registration error | **0.665 px** mean corner error |
-| Registration confidence | 0.901 |
-| Precision | **0.938** |
-| Recall | **0.854** |
-| F1 | **0.888** |
-| Event-kind accuracy | 0.698 |
+| Registration confidence | 0.9008 |
+| Precision | **0.9375** |
+| Recall | **0.8542** |
+| F1 | **0.8875** |
+| Event-kind accuracy | 0.6979 |
 | **False positives on still pairs** | **0.0** |
 
-Nine of the 24 cases score a perfect F1 = 1.000 with kind = 1.000.
+Two disclosures that a reader needs in order to interpret those numbers, and
+which an earlier version of this report omitted:
+
+- **These are macro averages** — the mean of the per-case scores. The micro
+  averages, which weight each case by how many changes it contains, are
+  **P 0.9318, R 0.8542, F1 0.8913** (82 true positives, 6 false positives,
+  14 missed). Macro is quoted because a per-case mean does not let one dense
+  case dominate; the difference between the two is small and both are reported.
+- **A reported box counts as the same change as an expected one at IoU ≥ 0.25.**
+  That is a generous threshold for a 1600×1200 canonical frame; a stricter one
+  would lower recall without the detector changing at all, so the value is
+  stated rather than buried in a constant.
+
+Ten of the 24 cases score a perfect F1 = 1.000 with kind = 1.000.
 
 **The still-pair number is the one that decides whether the system is usable.**
 A detector that finds things is not hard. One that reliably finds *nothing* when
@@ -411,9 +499,9 @@ benchmark of only successes measures the benchmark.
    difference mask forms one connected component, the system reports one region
    where there were two. The change is not lost; it is simply not split. Pinned
    by a test that fails if the behaviour changes.
-2. **Seven of 24 cases report 3 events where 4 are expected**, with low
-   kind accuracy. One change is being merged away — the same structural problem
-   as move-pairing, now visible on other event types.
+2. **Ten of 24 cases report fewer events than expected**, with low kind
+   accuracy. One change is being merged away — the same structural problem as
+   move-pairing, now visible on other event types.
 3. **One seed fragments a move destination** into two regions instead of one,
    costing precision on that case. The polarity guard correctly refuses to fuse
    opposite-polarity regions, but splits a genuine arrival whose fragments

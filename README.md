@@ -120,9 +120,12 @@ That is the environment the table above came from, on Python 3.13.12.
 ### Without the model weights
 
 The feature backend is pluggable. If the ONNX weights are absent, the pipeline
-falls back to SIFT + FLANN and keeps working — lower accuracy, no download. The
-reported backend always says which one ran, so a number is never attributed to the
-wrong matcher.
+falls back to SIFT + FLANN and keeps working — lower accuracy, no download. Every
+result reports two fields: `feature_backend`, the matcher the configuration
+resolved to, and `match_backend`, the matcher that actually ran for that pair.
+They differ when the structure guard diverts a thin pair to the classical path
+or refuses a flat one, which is how a number stays attached to the code that
+produced it.
 
 ---
 
@@ -137,7 +140,7 @@ unchanged inside a container, a serverless function, or the local service.
 | Stage | Module | What it does |
 |---|---|---|
 | Features | `features.py` | ALIKED + LightGlue, with a SIFT/ORB fallback and a guard against featureless frames |
-| Geometry | `geometry.py` | USAC/MAGSAC homography, with a fundamental-matrix model for scenes with real depth |
+| Geometry | `geometry.py` | USAC/MAGSAC homography; a fundamental-matrix model exists for scenes with real depth and is estimated only when `prefer_planar` is turned off |
 | Diff | `diff.py` | Two-channel change detection (luminance **and** chrominance) with per-pair threshold calibration |
 | Events | `events.py` | Regions → typed events, including separating a translation from a removal plus an insertion |
 | Coverage | `coverage.py` | Per-cell observation map and the resulting capture guidance |
@@ -186,14 +189,19 @@ a run is reproducible to the pixel.
 | Metric | Result |
 |---|---|
 | Registration error | **0.665 px** mean corner error |
-| Registration confidence | 0.901 |
-| Precision | **0.938** |
-| Recall | **0.854** |
-| F1 | **0.888** |
-| Event-kind accuracy | 0.698 |
+| Registration confidence | 0.9008 |
+| Precision | **0.9375** |
+| Recall | **0.8542** |
+| F1 | **0.8875** |
+| Event-kind accuracy | 0.6979 |
 | **False positives on still pairs** | **0.0** |
 
-Nine of the 24 cases score a perfect F1 = 1.000 with kind = 1.000.
+These are macro averages over the 24 cases; the micro averages are P 0.9318,
+R 0.8542, F1 0.8913, and a reported box counts as the same change at IoU ≥ 0.25.
+`python scripts/figures.py` regenerates every number above from the committed
+run, and a test fails if this table stops agreeing with it.
+
+Ten of the 24 cases score a perfect F1 = 1.000 with kind = 1.000.
 
 **The still-pair number is the one that matters.** A change detector that finds
 things is not hard; one that reliably finds *nothing* when nothing changed is what
@@ -283,9 +291,13 @@ crash that would have taken the whole service process down.
 Stated plainly, because a system that reports on the world should be judged on
 where it stops working:
 
-- **Planar assumption by default.** A homography is chosen for near-planar scenes
-  and a fundamental matrix otherwise, but a scene that is neither is registered
-  approximately at best.
+- **Planar assumption by default.** `prefer_planar` ships as `True`, so the
+  published numbers describe the homography path: all 24 cases registered as
+  `homography` and none recorded a model-comparison note. The fundamental-matrix
+  branch is real and is covered by tests that turn it on, but the benchmark
+  contains no scene with enough depth structure to make it the better model, so
+  a scene that is neither planar nor well-modelled by a fundamental matrix is
+  registered approximately at best and that case is unmeasured.
 - **Single-frame registration.** The baseline's first frame anchors the canonical
   frame; additional frames contribute to coverage but not to the alignment.
 - **No metric scale.** The output is in canonical pixels. It says an object moved

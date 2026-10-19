@@ -23,8 +23,11 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "vision"))
 
-from strata_core.config import PipelineConfig  # noqa: E402
+from strata_core.config import FeatureConfig, PipelineConfig  # noqa: E402
 from strata_core.evaluate import bbox_iou  # noqa: E402
+from strata_core.features import neural_available  # noqa: E402
+
+_NEURAL = neural_available(FeatureConfig())
 from strata_core.pipeline import run_scan  # noqa: E402
 from strata_core.synth import make_scene, make_still_pair  # noqa: E402
 
@@ -303,3 +306,120 @@ class TestCoverage:
         # rather than implying the empty regions are confirmed unchanged.
         _, result = scan(6002)
         assert result.coverage is not None
+
+
+class TestActivePerceptionCloses:
+    """A requested capture has to change what the system knows it observed.
+
+    The agent's loop is observe → decide → act, and the "act" is asking for
+    another view. If that view cannot move the coverage number, the loop is
+    open, the coverage bar can never be met, and the trace says "re-running the
+    comparison" while re-running something identical. These tests are the
+    difference between active perception and a scripted pipeline.
+    """
+
+    @staticmethod
+    def _second_view(seed: int, size):
+        """The same place, photographed from a wider pose.
+
+        ``pose_strength`` scales the camera difference without touching the
+        object layout, so the two rescan frames show identical content from
+        different stands - which is what a person does when asked to step left.
+        """
+        first = make_scene(seed=seed, size=size, n_objects=12, n_mutations=4)
+        second = make_scene(
+            seed=seed, size=size, n_objects=12, n_mutations=4, pose_strength=2.2
+        )
+        assert first.rescan.shape == second.rescan.shape
+        assert not np.array_equal(first.rescan, second.rescan)
+        return first, second
+
+    def test_one_view_reports_no_extra_frames(self):
+        first, _ = self._second_view(6100, SIZE)
+        result = run_scan([first.baseline], [first.rescan], config=PipelineConfig())
+        assert result.extra_views == []
+
+    def test_a_further_view_is_registered_and_credited(self):
+        first, second = self._second_view(6101, SIZE)
+        result = run_scan(
+            [first.baseline], [first.rescan, second.rescan], config=PipelineConfig()
+        )
+        assert len(result.extra_views) == 1
+        view = result.extra_views[0]
+        assert view["frame"] == 2
+        assert view["registered"] is True, view
+        assert view["inliers"] > 0
+        assert view["points_credited"] > 0
+
+    def test_the_extra_view_raises_observed_coverage(self):
+        first, second = self._second_view(6102, SIZE)
+        cfg = PipelineConfig()
+        one = run_scan([first.baseline], [first.rescan], config=cfg)
+        two = run_scan([first.baseline], [first.rescan, second.rescan], config=cfg)
+        assert two.coverage.frame_count > one.coverage.frame_count
+        assert two.coverage.observed_fraction > one.coverage.observed_fraction, (
+            one.coverage.observed_fraction, two.coverage.observed_fraction
+        )
+
+    def test_the_primary_result_is_unchanged_by_an_extra_view(self):
+        """The change set compares the two visits; a third view adds evidence,
+        it does not rewrite what was found."""
+        first, second = self._second_view(6103, SIZE)
+        cfg = PipelineConfig()
+        one = run_scan([first.baseline], [first.rescan], config=cfg)
+        two = run_scan([first.baseline], [first.rescan, second.rescan], config=cfg)
+        assert [e.kind for e in two.events] == [e.kind for e in one.events]
+        assert two.registration.confidence == pytest.approx(one.registration.confidence)
+
+    def test_an_unregistrable_view_is_reported_rather_than_credited(self):
+        """A frame that cannot be aligned must not silently count as coverage."""
+        first, _ = self._second_view(6104, SIZE)
+        blank = np.full_like(first.rescan, 128)
+        result = run_scan(
+            [first.baseline], [first.rescan, blank], config=PipelineConfig()
+        )
+        view = result.extra_views[0]
+        assert view["registered"] is False
+        assert view["points_credited"] == 0
+        assert "reason" in view or "error" in view
+
+
+class TestBackendReporting:
+    """A number must be attributed to the matcher that produced it.
+
+    The structure guard can divert a thin pair away from LightGlue, or refuse a
+    flat pair outright. If the result still named only the resolved backend, a
+    measurement taken on the classical path would be reported as a neural one -
+    which is exactly how a benchmark quietly stops describing the system.
+    """
+
+    def test_the_matcher_that_ran_is_named(self):
+        _, result = scan(7001)
+        assert result.match_backend in {
+            "neural-lightglue", "classic-sift", "classic-orb",
+            "classic-lowstructure", "degenerate-flat",
+        }
+        assert result.to_summary()["match_backend"] == result.match_backend
+
+    @pytest.mark.skipif(
+        not _NEURAL, reason="neural weights absent; no diversion to observe"
+    )
+    def test_a_refused_pair_reports_the_refusal_not_the_neural_matcher(self):
+        blank = np.full((360, 480, 3), 128, np.uint8)
+        result = run_scan([blank], [blank], config=PipelineConfig())
+        assert result.feature_backend == "neural-lightglue"
+        assert result.match_backend == "degenerate-flat"
+        assert result.registration.model == "identity"
+
+    @pytest.mark.skipif(
+        not _NEURAL, reason="neural weights absent; no diversion to observe"
+    )
+    def test_an_extra_view_names_its_own_matcher(self):
+        first = make_scene(seed=7002, size=SIZE, n_objects=12, n_mutations=4)
+        second = make_scene(
+            seed=7002, size=SIZE, n_objects=12, n_mutations=4, pose_strength=2.2
+        )
+        result = run_scan(
+            [first.baseline], [first.rescan, second.rescan], config=PipelineConfig()
+        )
+        assert result.extra_views[0]["backend"]

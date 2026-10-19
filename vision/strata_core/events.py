@@ -307,7 +307,6 @@ OBJECTNESS_STRONG = PRESENCE_STRONG
 
 def resolve_events(
     baseline_diff: DiffResult,
-    rescan_diff: DiffResult | None,
     cfg: EventConfig,
     *,
     baseline_shape: tuple[int, int],

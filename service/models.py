@@ -201,8 +201,19 @@ class RescanResponse(BaseModel):
 
     session_id: str
     scan_index: int
-    outcome: str = Field(description="finalized, awaiting_approval, or aborted")
+    outcome: str = Field(description="finalized, declined (awaiting a decision), or aborted")
     feature_backend: str
+    match_backend: str = Field(
+        default="",
+        description="The matcher that actually ran for this pair. It differs from "
+                    "feature_backend when the structure guard diverts a thin pair "
+                    "to the classical path or refuses a flat one.",
+    )
+    extra_views: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Further frames of the second visit, whether each was "
+                    "registered, and what it contributed to coverage.",
+    )
     registration: RegistrationOut
     events: list[EventOut]
     event_totals: dict[str, int]
