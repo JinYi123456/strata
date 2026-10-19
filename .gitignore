@@ -38,6 +38,7 @@ artifacts/
 !docs/**/*.png
 !docs/**/*.svg
 !web/public/**/*.png
+!service/static/media/*.mp4
 !web/public/**/*.svg
 
 # --- Secrets ---

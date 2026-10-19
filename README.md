@@ -6,7 +6,7 @@ Photograph a place once. Photograph it again later. Get a typed, confidence-scor
 account of what changed — with the measurements behind every claim, and the
 reasoning that produced it, shown alongside the answer.
 
-**[Live app →](https://f3ba7914438c401ca724dd1522121433.sg2.agentos-app.run)** — opens on
+**[Live app →](https://fcbd487d1c0e428084b4f74d5993985f.sg2.agentos-app.run)** — opens on
 five sample sites that need nothing uploaded.
 
 ### Documentation
