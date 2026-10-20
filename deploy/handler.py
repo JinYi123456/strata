@@ -397,9 +397,10 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
                 payload["recorded"] = False
                 payload["record_error"] = str(exc)
 
-    # stdout rather than the logging module: in a Lambda container the logger
-    # prefixes each record with its own framing, and a JSON line that arrives
-    # wrapped in text is a JSON line nobody's metrics filter can read.
+    # stdout rather than the logging module: the Lambda runtime prefixes each
+    # logger record with its own framing (level, timestamp, request id), and a
+    # JSON line that arrives wrapped in text is a JSON line nobody's metrics
+    # filter can read.
     print(log_line(payload), flush=True)
     if os.environ.get("STRATA_EMIT_METRICS") == "1":
         payload["metrics"] = emit_metrics(metric_datapoints(payload))

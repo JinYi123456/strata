@@ -50,17 +50,24 @@ serverless
 | Architecture diagram | `https://github.com/JinYi123456/strata/blob/master/docs/architecture.svg` | yes |
 | Demo video | `https://youtu.be/iJZIpOdfq6Y` (4:50) | yes — the project page embeds this one |
 | Demo / live URL | `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs` | yes — the deployed API's own Swagger UI, no account needed |
+| Second "Try it out" link | `https://github.com/JinYi123456/strata` | yes — the repo appears as a button too, not only in the Source-code field |
 | Console (static) | `https://strata-console-rouge.vercel.app` | yes, but behind Vercel login — see the note |
 
-**For the Demo URL field, use the `/api/docs` URL.** It is the deployed AWS API
-speaking to itself: the page is served by the same Lambda that runs the pipeline,
-and "Try it out" on `POST /api/sessions` really does register two frames on
-Graviton. The Vercel console is now built against that API and was verified in a
-browser, but **Vercel Deployment Protection is on for the project**, so a judge
-who clicks it lands on a Vercel login instead of the demo. Turn it off under
-Project → Settings → Deployment Protection before using the console URL in any
-public post. A judge clicking a link that demands a login costs more than a link
-that is absent.
+**The "Try it out" links field carries two entries.** The first is the deployed
+AWS API's Swagger UI: the page is served by the same Lambda that runs the
+pipeline, and "Try it out" on `POST /api/sessions` really does register two
+frames on Graviton. The second is the repository, so a judge who only scans the
+buttons at the top of the project page reaches the code in one click — the
+hackathon's separate *Repository URL* field is required and also filled, but it
+sits in the judges-only section, so it is worth repeating publicly.
+
+**Do not use the Vercel console URL yet.** The console is built against the AWS
+API and was verified in a browser, but **Vercel Deployment Protection is on for
+the project**, so a judge who clicks it lands on a Vercel login instead of the
+demo. Turn it off under Project → Settings → Deployment Protection — and while
+that project is open, set its **Root Directory to `web`**, which is why every
+git-triggered Vercel build of this repository fails with "Couldn't find any
+`pages` or `app` directory" while the manually deployed one is live.
 
 ---
 

@@ -6,12 +6,15 @@ Where everything lives, and what to look at first.
 → <http://127.0.0.1:8000>. No configuration, no API keys, no model download
 required to start; the five sample sites are generated on first run.
 
-**Film (4:42, under the five-minute cap)** —
-[strata-demo.mp4](../service/static/media/strata-demo.mp4) · also served at
+**Film (4:50, under the five-minute cap)** —
+[strata-demo.mp4](../web/public/media/strata-demo.mp4) · also served at
 `/media/strata-demo.mp4` when the app is running. It opens on authorship, runs
 the application end to end, walks the architecture layer by layer, and closes on
 the results and the failure cases. `python scripts/build_video.py --install`
-rebuilds it from the committed diagram and the committed evaluation artefact.
+rebuilds it from committed inputs: the console's palette and fonts,
+`docs/architecture.png`, `docs/evaluation.json`, and the screen-capture segment
+`web/public/media/strata-demo-segment.mp4` — a recording of a live run, which is
+the one input no script can regenerate, so it is committed too.
 
 ---
 

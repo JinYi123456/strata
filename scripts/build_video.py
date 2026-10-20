@@ -23,7 +23,11 @@ Design constraints, all of them earned the hard way:
   passes rather than one.
 - Every visual is generated from a committed source: the palette and font stack
   from the console's own configuration, the diagram from docs/architecture.png,
-  the numbers from docs/evaluation.json.
+  the numbers from docs/evaluation.json, and the 2:45 screen capture from
+  web/public/media/strata-demo-segment.mp4 - committed because a recording of a
+  live run is the one input no script can regenerate. Rebuilding with the default
+  ``--demo`` therefore reproduces the film exactly; pointing it at the finished
+  film instead would nest the film inside itself.
 """
 
 from __future__ import annotations
@@ -558,7 +562,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--build-dir", type=Path, default=ROOT / "build" / "video")
     ap.add_argument("--demo", type=Path,
-                    default=ROOT / "web" / "public" / "media" / "strata-demo.mp4")
+                    default=ROOT / "web" / "public" / "media" / "strata-demo-segment.mp4",
+                    help="the screen-capture segment; committed, because it cannot be regenerated")
     ap.add_argument("--metrics", type=Path, default=ROOT / "docs" / "evaluation.json")
     ap.add_argument("--install", action="store_true",
                     help="copy the finished film over the one the app serves")
