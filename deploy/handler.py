@@ -69,6 +69,51 @@ def load_image(bucket: str, key: str) -> np.ndarray:
     return image
 
 
+#: The two files the neural backend needs, in the order the extractor resolves them.
+WEIGHT_FILES = ("aliked-n16rot-top2k-640.onnx", "lightglue_for_aliked.onnx")
+
+
+def ensure_weights(model_dir: str) -> list[str]:
+    """Stage the feature weights into a writable directory before the run.
+
+    The container image carries them; the zip package cannot - numpy plus
+    OpenCV plus 50 MB of ONNX unpacks past Lambda's 250 MB ceiling. So a
+    zip-deployed function pulls them from the session bucket into ``/tmp`` on
+    its first call. In-region that is about a second, once per execution
+    environment, and the vision core is untouched: it still only ever reads a
+    directory, which is the property that keeps it pure.
+
+    Returns the names it fetched, so the response can say whether this
+    invocation ran the neural path or the classical one.
+    """
+    bucket = os.environ.get("STRATA_S3_BUCKET")
+    prefix = os.environ.get("STRATA_WEIGHT_PREFIX", "models/")
+    if not bucket or not model_dir:
+        return []
+    fetched: list[str] = []
+    try:
+        os.makedirs(model_dir, exist_ok=True)
+    except OSError as exc:  # pragma: no cover - /tmp is writable in Lambda
+        log.warning("cannot create %s: %s", model_dir, exc)
+        return []
+    for name in WEIGHT_FILES:
+        target = os.path.join(model_dir, name)
+        if os.path.exists(target):
+            continue
+        try:
+            s3().download_file(bucket, f"{prefix}{name}", target)
+            fetched.append(name)
+        except Exception as exc:
+            # A missing weight is not an error, it is a backend choice. Say
+            # which one ran rather than letting a latency graph imply the other.
+            log.warning("weight %s unavailable (%s); classical backend will be used",
+                        name, exc)
+            return []
+    if fetched:
+        log.info("staged %d weight(s) into %s", len(fetched), model_dir)
+    return fetched
+
+
 def build_config() -> PipelineConfig:
     """Build the pipeline config from the environment.
 
@@ -77,12 +122,14 @@ def build_config() -> PipelineConfig:
     configuration into the next one.
     """
     backend = os.environ.get("STRATA_BACKEND", "auto")
+    model_dir = os.environ.get("STRATA_MODEL_DIR", "/var/task/models")
+    ensure_weights(model_dir)
     return replace(
         PipelineConfig(),
         features=replace(
             FeatureConfig(),
             backend=backend,  # type: ignore[arg-type]
-            model_dir=os.environ.get("STRATA_MODEL_DIR", "/var/task/models"),
+            model_dir=model_dir,
         ),
     )
 

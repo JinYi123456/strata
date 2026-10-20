@@ -266,3 +266,68 @@ def test_metrics_are_chunked_to_the_service_limit(mod):
     assert len(points) > 20
     chunks = [points[i:i + 20] for i in range(0, len(points), 20)]
     assert all(len(c) <= 20 for c in chunks)
+
+
+class TestWeightStaging:
+    """The zip package cannot carry 50 MB of weights, so the function fetches them.
+
+    A missing weight is a backend choice, not a failure - and the difference
+    between "ran the neural path" and "quietly ran SIFT" is exactly the thing a
+    latency or accuracy number must not be allowed to hide.
+    """
+
+    class FakeS3:
+        def __init__(self, available):
+            self.available = set(available)
+            self.requested = []
+
+        def download_file(self, bucket, key, target):
+            self.requested.append(key)
+            name = key.rsplit("/", 1)[-1]
+            if name not in self.available:
+                raise RuntimeError(f"NoSuchKey: {key}")
+            Path(target).write_bytes(b"fake-onnx")
+
+    def _run(self, mod, monkeypatch, tmp_path, available, existing=(), bucket="b"):
+        import pathlib
+        staging = tmp_path / "models"
+        staging.mkdir()
+        for name in existing:
+            (staging / name).write_bytes(b"x")
+        fake = self.FakeS3(available)
+        monkeypatch.setattr(mod, "s3", lambda: fake)
+        monkeypatch.setenv("STRATA_S3_BUCKET", bucket)
+        monkeypatch.setenv("STRATA_WEIGHT_PREFIX", "models/")
+        return mod.ensure_weights(str(staging)), fake, staging
+
+    def test_both_weights_are_fetched_when_absent(self, mod, monkeypatch, tmp_path):
+        fetched, fake, _ = self._run(mod, monkeypatch, tmp_path, set(mod.WEIGHT_FILES))
+        assert fetched == list(mod.WEIGHT_FILES)
+        assert fake.requested == ["models/" + n for n in mod.WEIGHT_FILES]
+
+    def test_an_existing_weight_is_not_refetched(self, mod, monkeypatch, tmp_path):
+        fetched, fake, _ = self._run(
+            mod, monkeypatch, tmp_path, set(mod.WEIGHT_FILES),
+            existing=(mod.WEIGHT_FILES[0],),
+        )
+        assert fetched == [mod.WEIGHT_FILES[1]]
+        assert fake.requested == ["models/" + mod.WEIGHT_FILES[1]]
+
+    def test_a_missing_weight_degrades_without_raising(self, mod, monkeypatch, tmp_path):
+        """The classical backend is a legitimate answer; a crash is not."""
+        fetched, _fake, _ = self._run(mod, monkeypatch, tmp_path, {mod.WEIGHT_FILES[0]})
+        assert fetched == []
+
+    def test_no_bucket_means_no_fetch(self, mod, monkeypatch, tmp_path):
+        monkeypatch.delenv("STRATA_S3_BUCKET", raising=False)
+        assert mod.ensure_weights(str(tmp_path / "m")) == []
+
+    def test_the_prefix_is_honoured(self, mod, monkeypatch, tmp_path):
+        import pathlib
+        staging = tmp_path / "m"
+        fake = self.FakeS3(set(mod.WEIGHT_FILES))
+        monkeypatch.setattr(mod, "s3", lambda: fake)
+        monkeypatch.setenv("STRATA_S3_BUCKET", "b")
+        monkeypatch.setenv("STRATA_WEIGHT_PREFIX", "v2/weights/")
+        mod.ensure_weights(str(staging))
+        assert all(k.startswith("v2/weights/") for k in fake.requested)
