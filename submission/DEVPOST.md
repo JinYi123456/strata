@@ -7,8 +7,8 @@ Every field of the submission form, filled. Paste-ready.
 | Field | Blocked on |
 |---|---|
 | Video URL | filled — `https://youtu.be/iJZIpOdfq6Y` (4:50, verified reachable without a login) |
-| Demo URL | filled — the AWS API's Swagger UI (see §2); the Vercel console needs Deployment Protection off before it is worth linking |
-| Gallery images + thumbnail | your browser — Devpost's dropzone keeps one file per programmatic upload |
+| Demo URL | filled — the live app plus the API and the repository (see §2) |
+| Gallery images + thumbnail | done — 7 images with captions, and the project thumbnail |
 | Submit | your account, and the final click |
 
 Everything else below can be pasted as it stands.
@@ -51,23 +51,26 @@ serverless
 | Demo video | `https://youtu.be/iJZIpOdfq6Y` (4:50) | yes — the project page embeds this one |
 | Demo / live URL | `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs` | yes — the deployed API's own Swagger UI, no account needed |
 | Second "Try it out" link | `https://github.com/JinYi123456/strata` | yes — the repo appears as a button too, not only in the Source-code field |
-| Console (static) | `https://strata-console-rouge.vercel.app` | yes, but behind Vercel login — see the note |
+| Live app | `https://strata-console-rouge.vercel.app` | yes — public, no account, calls the AWS API |
+| Console source | `web/` (static export) | yes — deployed from `master` |
 
-**The "Try it out" links field carries two entries.** The first is the deployed
-AWS API's Swagger UI: the page is served by the same Lambda that runs the
-pipeline, and "Try it out" on `POST /api/sessions` really does register two
-frames on Graviton. The second is the repository, so a judge who only scans the
-buttons at the top of the project page reaches the code in one click — the
-hackathon's separate *Repository URL* field is required and also filled, but it
-sits in the judges-only section, so it is worth repeating publicly.
+**The "Try it out" links field carries three entries.** First the live
+application, which is what a judge wants to click: the console, served from
+Vercel, calling the deployed pipeline on Graviton. Second the API's own Swagger
+UI (`/api/docs`), served by the same Lambda, where "Try it out" on
+`POST /api/sessions` really registers two frames. Third the repository, so the
+code is one click from the top of the page too — the hackathon's separate
+*Repository URL* field is required and also filled, but it sits in the
+judges-only section, so it is worth repeating publicly.
 
-**Do not use the Vercel console URL yet.** The console is built against the AWS
-API and was verified in a browser, but **Vercel Deployment Protection is on for
-the project**, so a judge who clicks it lands on a Vercel login instead of the
-demo. Turn it off under Project → Settings → Deployment Protection — and while
-that project is open, set its **Root Directory to `web`**, which is why every
-git-triggered Vercel build of this repository fails with "Couldn't find any
-`pages` or `app` directory" while the manually deployed one is live.
+**Why the production URL is the one to use.** Vercel's Deployment Protection
+covers *deployment* URLs
+(`strata-console-<hash>-cargomatrix1.vercel.app` → `302` to Vercel
+Authentication) and not the project's production URL, which is open — an earlier
+revision of this packet warned about a login wall after checking a deployment
+URL, and that warning was wrong about the link judges are given. Verified from
+outside this machine: `200` to an anonymous request, and the page's own network
+log shows `GET …execute-api…/api/sites → 200`.
 
 ---
 
@@ -265,6 +268,11 @@ negative over ground nobody photographed is actionable and wrong.
 
 ## Run it
 
+**Or don't install anything: the app is live at
+<https://strata-console-rouge.vercel.app>.** Pick a sample site, press *Run
+rescan*, and the pipeline registers the two visits on AWS Graviton and returns
+the typed change set, the coverage it could not see, and the approval gate.
+
 ```bash
 git clone https://github.com/JinYi123456/strata.git
 cd strata
@@ -438,9 +446,7 @@ Requirements taken verbatim from `opencv26.devpost.com`, and where each stands.
    uploaded through the app, and the result added to the report and the film. It
    is the only evidence that would answer "does this survive the real world",
    which is where the impact score is currently losing points.
-3. The Vercel console at `https://strata-console-rouge.vercel.app` is wired to the
-   AWS API and verified in a browser, but **Vercel Deployment Protection is on for
-   that project**, so an anonymous visitor gets a Vercel login. Switch it off
-   (Project → Settings → Deployment Protection) and the console becomes a
-   clickable demo too; until then the `/api/docs` URL above is the one to submit,
-   because it is the one that opens without an account.
+3. Nothing is blocking on the console any more: `https://strata-console-rouge.vercel.app`
+   is public, wired to the AWS API, verified in a browser, and deployed from
+   `master` on every push (see §2 for why the earlier "Vercel login" warning in
+   this packet was wrong, and `vercel.json` for the build fix it cost).

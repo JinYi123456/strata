@@ -6,16 +6,21 @@ Where everything lives, and what to look at first.
 → <http://127.0.0.1:8000>. No configuration, no API keys, no model download
 required to start; the five sample sites are generated on first run.
 
-**Or click it live, with nothing installed** —
+**The live app, nothing to install** — <https://strata-console-rouge.vercel.app>.
+Open it, pick **Loading Bay 4**, press **Run rescan**: the two visits are
+registered on AWS Graviton and four typed changes come back, each with its
+measurement and confidence; **Coverage** shows the 30% of the frame that was not
+observed well enough to compare, and the gate at the bottom records the history
+row only when you approve it. Verified from outside this machine: the production
+URL answers `200` to an anonymous request and its page calls
+`https://…execute-api…/api/sites` directly.
+
+**The same backend without the UI** —
 <https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs> is the deployed
-API's own Swagger UI, served by the Lambda that runs the pipeline on AWS Graviton:
+API's own Swagger UI, served by the Lambda that runs the pipeline:
 `POST /api/sessions` then `/rescan` really registers two frames and returns the
 typed change set. `…/api/health` answers with the OpenCV version, the resolved
 backend (`neural-lightglue`), the storage backend (`s3`) and the enforced limits.
-The browser console is deployed at <https://strata-console-rouge.vercel.app> and
-was verified against that API, but **Vercel Deployment Protection is still on for
-that project**, so an anonymous visitor gets a Vercel login — use the API URL
-above, or the local run, until that setting is changed.
 
 **Film (4:50, under the five-minute cap)** —
 [strata-demo.mp4](../web/public/media/strata-demo.mp4) · also served at

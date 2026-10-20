@@ -65,17 +65,18 @@ docker run -p 8000:8000 strata
 Render → New → Blueprint → pick the repository. Railway, Fly.io, Cloud Run and
 ECS take the same image.
 
-### The console on Vercel
+### The console on Vercel — the live app
 
-The static console is deployed separately at
-<https://strata-console-rouge.vercel.app>, built from `web/` on Vercel's own
-Next.js pipeline. That is the split §1.1 describes: the interface on a CDN, the
-vision workload on AWS.
-
-It is built with `NEXT_PUBLIC_API_BASE` set to the deployed AWS API, so the page
-and the pipeline are two different hosts and the browser calls AWS directly:
+**<https://strata-console-rouge.vercel.app>** is the application, publicly
+reachable: no account, no login, nothing to install. It is the static export of
+`web/`, built with `NEXT_PUBLIC_API_BASE` pointed at the deployed AWS API, so the
+page and the pipeline are two hosts and the browser calls AWS directly. Verified
+from outside this machine just now: the production URL answers `200` to an
+anonymous request, the page renders the five sample sites, and the network log
+shows `GET https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/sites → 200`.
 
 ```bash
+# Rebuild it by hand from web/ (a push to master does this automatically now):
 NEXT_PUBLIC_API_BASE=https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com \
   npx vercel deploy --prod
 ```
@@ -88,18 +89,28 @@ document, which would have sent anyone who followed it to a build that still
 talked to itself.
 
 Verified in a browser against the deployed API, not against a local server: the
-sample sites load from `https://…execute-api…/api/sites`, a rescan returns four
-typed events with their confidences, and approving the change set writes the
-history row — `Recorded · scan #0 · finalized · alignment 92% ·
-neural-lightglue`. That last part is the ledger's semantics, and it is the reason
-the gate is clicked in the check rather than assumed: an approved scan used to be
-recorded as declined.
+sample sites load from `…execute-api…/api/sites`, a rescan returns four typed
+events with their confidences, and approving the change set writes the history
+row — `Recorded · scan #0 · finalized · alignment 92% · neural-lightglue`. That
+last part is the ledger's semantics, and it is the reason the gate is clicked in
+the check rather than assumed: an approved scan used to be recorded as declined.
 
-**Deployment protection is on for this project** (Vercel → Project → Settings →
-Deployment Protection, "Vercel Authentication"). An anonymous visitor is
-redirected to a Vercel login, so the URL is not yet something a judge can open.
-It is left as the one switch to flip in the dashboard rather than changed from
-here, because turning a private deployment public is not a build step.
+**Two things worth knowing about that URL.** First, the login wall some earlier
+revision of this document warned about applies to *deployment* URLs
+(`strata-console-<hash>-cargomatrix1.vercel.app` → `302` to Vercel
+Authentication), not to the project's production URL, which is the one above and
+is open. The earlier warning was written from a deployment URL and was therefore
+wrong about the thing judges are given. Second, every push to `master` used to
+produce a **failed** Vercel build: the project's root directory is the repository
+while the Next app lives in `web/`, so Vercel ran `next build` one level too high
+and died on "Couldn't find any `pages` or `app` directory". Root Directory is a
+dashboard-only setting, so the fix lives in the repository instead —
+[`vercel.json`](../vercel.json) sets `installCommand`, `buildCommand` and
+`outputDirectory` around `web/`, and `"framework": null` because the artefact is
+a static export, not a Next server: with the Next builder still enabled the build
+succeeded and Vercel then rejected the result looking for
+`web/out/routes-manifest.json`, which an export does not produce. Push-triggered
+production builds are green from that change onward.
 
 The first deploy attempt was rejected by Vercel's dependency gate: `next@15.1.6`
 pulls a `postcss` with published advisories, and the platform blocks the

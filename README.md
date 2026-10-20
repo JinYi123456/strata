@@ -8,7 +8,12 @@ Photograph a place once. Photograph it again later. Get a typed, confidence-scor
 account of what changed — with the measurements behind every claim, and the
 reasoning that produced it, shown alongside the answer.
 
-**Run it:** `pip install -r requirements.txt && python scripts/serve.py` →
+**Live app:** <https://strata-console-rouge.vercel.app> — open it, click a sample
+site, press **Run rescan**, and the pipeline registers the two visits on AWS
+Graviton and returns the typed change set. No account, nothing to install.
+API without the UI: <https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs>.
+
+**Run it locally:** `pip install -r requirements.txt && python scripts/serve.py` →
 <http://127.0.0.1:8000>. Opens on five sample sites that need nothing uploaded.
 No configuration and no API keys required.
 
@@ -293,21 +298,22 @@ invocation is refused in the account used here** even with the canonical public
 resource policy — `docs/DEPLOYMENT.md` §2 records that, and the other findings
 that only a real deployment produces.
 
-### The console on Vercel
+### The live app on Vercel
 
-`web/` exports statically and is deployed to
-<https://strata-console-rouge.vercel.app>, built with
-`NEXT_PUBLIC_API_BASE` pointed at the AWS API above, so the browser calls AWS
-directly. Verified in a real browser against the deployed API: the site list
-loads from `…/api/sites`, a rescan returns four typed events, and approving the
-change set writes the history row.
+**<https://strata-console-rouge.vercel.app>** — the application, in public, with
+nothing to install. It is the static export of `web/`, built with
+`NEXT_PUBLIC_API_BASE` pointed at the AWS API above, so the browser calls
+Graviton directly. Verified from outside this machine: the production URL answers
+`200` to an anonymous request, the sample sites load from
+`…/api/sites`, a rescan returns four typed events, and approving the change set
+writes the history row.
 
-It is not yet a link to hand a judge: **Vercel Deployment Protection is on for
-the project**, so an anonymous visitor is redirected to a Vercel login, and the
-project's root directory is unset, so git-triggered builds fail while the
-manually deployed one stays live. Both are one-line settings in the Vercel
-dashboard, and neither is required by the competition — the submitted
-"working web endpoint" is the AWS API, which needs no account.
+Pushes to `master` deploy it automatically. That needed
+[`vercel.json`](vercel.json): the Vercel project's root directory is the
+repository while the app lives in `web/`, so every git build ran `next build` one
+level too high and failed with "Couldn't find any `pages` or `app` directory";
+and `"framework": null` is required because the artefact is a static export, not
+a Next server. Details in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §1.
 
 ### Repository layout
 
