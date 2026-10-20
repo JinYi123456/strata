@@ -1,0 +1,224 @@
+{
+  "started_at": "2026-10-20T01:28:02+00:00",
+  "account": "478726716377",
+  "region": "us-east-1",
+  "bucket": "strata-sessions-478726716377",
+  "table": "strata-ledger",
+  "failures": [],
+  "function": {
+    "name": "strata-vision",
+    "arn": "arn:aws:lambda:us-east-1:478726716377:function:strata-vision",
+    "architectures": [
+      "arm64"
+    ],
+    "runtime": "python3.12",
+    "package_type": "Zip",
+    "image_uri": null,
+    "memory_size_mb": 3008,
+    "timeout_s": 120,
+    "last_update_status": "Successful"
+  },
+  "objects": {
+    "baseline": "verify/20261020-012803/baseline.jpg",
+    "rescan": "verify/20261020-012803/rescan.jpg"
+  },
+  "function_url": "https://hvmvamjmykphuwksajonu5zofi0ayrhd.lambda-url.us-east-1.on.aws/",
+  "function_url_error": "HTTPError: HTTP Error 403: Forbidden {\"Message\":\"Forbidden. For troubleshooting Function URL authorization issues, see: https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html\"}",
+  "invoked_via": "lambda_invoke",
+  "function_logs": "",
+  "latency_ms": 9156.5,
+  "response": {
+    "backend": "neural-lightglue",
+    "match_backend": "neural-lightglue",
+    "registration": {
+      "model": "homography",
+      "inliers": 1174,
+      "matches": 1210,
+      "inlier_ratio": 0.9702,
+      "reprojection_px": 1.012,
+      "confidence": 0.9231,
+      "notes": []
+    },
+    "events": [
+      {
+        "kind": "added",
+        "confidence": 1.0,
+        "box": [
+          978,
+          172,
+          140,
+          127
+        ],
+        "area_px": 17780,
+        "displacement_px": 0.0,
+        "appearance_delta": 94.004,
+        "summary": "Object added: 16955px of new structure present in the rescan"
+      },
+      {
+        "kind": "missing",
+        "confidence": 1.0,
+        "box": [
+          704,
+          1068,
+          90,
+          95
+        ],
+        "area_px": 8550,
+        "displacement_px": 0.0,
+        "appearance_delta": 175.423,
+        "summary": "Object removed: 8054px of structure present in the baseline is gone"
+      },
+      {
+        "kind": "added",
+        "confidence": 0.587,
+        "box": [
+          1292,
+          996,
+          111,
+          85
+        ],
+        "area_px": 9435,
+        "displacement_px": 0.0,
+        "appearance_delta": 27.895,
+        "summary": "Object added: 7928px of new structure present in the rescan"
+      },
+      {
+        "kind": "state_changed",
+        "confidence": 0.5142,
+        "box": [
+          56,
+          301,
+          301,
+          228
+        ],
+        "area_px": 68628,
+        "displacement_px": 0.0,
+        "appearance_delta": 10.468,
+        "summary": "Object changed in place (mean intensity delta 10.5)"
+      }
+    ],
+    "coverage": {
+      "status": "unobserved",
+      "observed_fraction": 0.375,
+      "frame_count": 1,
+      "grid": [
+        8,
+        12
+      ],
+      "view_requests": [
+        {
+          "direction": "tilt up",
+          "target_cell": [
+            0,
+            1
+          ],
+          "deficit": 0.978,
+          "priority": 0.978,
+          "reason": "upper cell (0,1) is under-observed; 3 cells in this direction are thin"
+        },
+        {
+          "direction": "pan left",
+          "target_cell": [
+            7,
+            0
+          ],
+          "deficit": 0.9778,
+          "priority": 0.9778,
+          "reason": "left-of-frame cell (7,0) is under-observed; 3 cells in this direction are thin"
+        },
+        {
+          "direction": "tilt down",
+          "target_cell": [
+            7,
+            10
+          ],
+          "deficit": 0.9777,
+          "priority": 0.9777,
+          "reason": "lower cell (7,10) is under-observed; 3 cells in this direction are thin"
+        }
+      ]
+    },
+    "timings_ms": {
+      "extract_baseline_ms": 1264.467,
+      "extract_rescan_ms": 839.78,
+      "match_ms": 4941.151,
+      "register_ms": 3.933,
+      "coverage_ms": 890.068,
+      "warp_ms": 19.621,
+      "diff_ms": 120.548,
+      "events_ms": 19.357,
+      "total_ms": 8778.745
+    },
+    "ok": true,
+    "site_id": "verify-bay-4",
+    "session_id": "20261020-012803",
+    "wall_ms": 8877.5,
+    "recorded": true
+  },
+  "ledger_query": {
+    "pk": "lambda/ledger/verify-bay-4",
+    "rows": 2,
+    "rows_for_this_run": 1
+  },
+  "ledger_row": {
+    "pk": "lambda/ledger/verify-bay-4",
+    "sk": "20261020-012803-1792459696535.json",
+    "events": 4
+  },
+  "cloudwatch_tail": [
+    "INIT_START Runtime Version: python:3.12.mainlinev2.v43\tRuntime Version ARN: arn:aws:lambda:us-east-1::runtime:0fec05b8b43b0ecfbabe4fd585b35e423f655861556712f8a10b0e8739c36c07",
+    "START RequestId: d9f165cc-0ab5-4c62-9b98-1f746d3e219a Version: $LATEST",
+    "[INFO]\t2026-10-20T01:27:07.033Z\td9f165cc-0ab5-4c62-9b98-1f746d3e219a\tstaged 2 weight(s) into /tmp/models",
+    "[ WARN:0@1.078] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now",
+    "[ WARN:0@1.827] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now",
+    "{\"ts\":1792459636,\"level\":\"INFO\",\"event\":\"scan\",\"ok\":true,\"site_id\":\"verify-bay-4\",\"session_id\":\"20261020-012700\",\"error\":null,\"backend\":\"neural-lightglue\",\"match_backend\":\"neural-lightglue\",\"event_count\":4,\"registration_model\":\"homography\",\"registration_confidence\":0.9231,\"observed_fraction\":0.375,\"wall_ms\":10086.7,\"stage_ms\":{\"extract_baseline_ms\":1338.782,\"extract_rescan_ms\":845.232,\"match_ms\":5073.701,\"register_ms\":13.523,\"coverage_ms\":928.864,\"warp_ms\":28.092,\"diff_ms\":126.348,\"events_ms\":21.024}}",
+    "END RequestId: d9f165cc-0ab5-4c62-9b98-1f746d3e219a",
+    "REPORT RequestId: d9f165cc-0ab5-4c62-9b98-1f746d3e219a\tDuration: 10148.81 ms\tBilled Duration: 10986 ms\tMemory Size: 3008 MB\tMax Memory Used: 2512 MB\tInit Duration: 836.56 ms",
+    "START RequestId: eb8d8498-6274-412b-8ece-bf6bc1055b5a Version: $LATEST",
+    "[ WARN:0@61.737] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now",
+    "[ WARN:0@62.394] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now",
+    "{\"ts\":1792459696,\"level\":\"INFO\",\"event\":\"scan\",\"ok\":true,\"site_id\":\"verify-bay-4\",\"session_id\":\"20261020-012803\",\"error\":null,\"backend\":\"neural-lightglue\",\"match_backend\":\"neural-lightglue\",\"event_count\":4,\"registration_model\":\"homography\",\"registration_confidence\":0.9231,\"observed_fraction\":0.375,\"wall_ms\":8877.5,\"stage_ms\":{\"extract_baseline_ms\":1264.467,\"extract_rescan_ms\":839.78,\"match_ms\":4941.151,\"register_ms\":3.933,\"coverage_ms\":890.068,\"warp_ms\":19.621,\"diff_ms\":120.548,\"events_ms\":19.357}}",
+    "END RequestId: eb8d8498-6274-412b-8ece-bf6bc1055b5a",
+    "REPORT RequestId: eb8d8498-6274-412b-8ece-bf6bc1055b5a\tDuration: 8890.33 ms\tBilled Duration: 8891 ms\tMemory Size: 3008 MB\tMax Memory Used: 2515 MB"
+  ],
+  "public_api": {
+    "base": "https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com",
+    "health": {
+      "status": "ok",
+      "service": "strata",
+      "api_version": "1.0",
+      "vision_backend": "neural-lightglue",
+      "executor": "aws",
+      "storage": "s3",
+      "opencv_version": "5.0.0",
+      "model_weights_present": true,
+      "limits": {
+        "max_upload_bytes": 12582912,
+        "max_frames_per_upload": 8,
+        "max_dimension": 6000,
+        "max_concurrent_scans": 2
+      }
+    },
+    "session_id": "ses_480df415ae1541a5",
+    "create_ms": 1834.5,
+    "rescan_ms": 11209.3,
+    "events": 4,
+    "kinds": [
+      "added",
+      "missing",
+      "state_changed"
+    ],
+    "backend": null,
+    "registration": {
+      "model": "homography",
+      "confidence": 0.9231,
+      "inlier_count": 1174,
+      "match_count": 1210,
+      "inlier_ratio": 0.9702,
+      "reproj_error_px": 1.0118,
+      "notes": []
+    }
+  },
+  "finished_at": "2026-10-20T01:28:32+00:00",
+  "verdict": "PASS"
+}

@@ -84,7 +84,7 @@ difference in the code, not in the data.
 
 Every figure quoted in these documents is generated from `docs/evaluation.json`
 by `scripts/figures.py`, and `tests/test_docs_agree_with_artifact.py` fails if a
-document stops matching the run. The whole suite — 468 tests, including 79 that
+document stops matching the run. The whole suite — 481 tests, including 79 that
 run the real pipeline end to end — passes on the locked dependency set, and
 `.github/workflows/ci.yml` re-runs the benchmark and gates it on every push.
 
@@ -99,11 +99,18 @@ sections are the ones worth reading closely:
   was available to measure it. The harness that produces it is in
   `deploy/benchmark/` and the protocol is in `docs/DEPLOYMENT.md` §3. Publishing
   a number that was not measured would contradict the point of the project.
-- **Nothing in this repository yet demonstrates a scan that executed on AWS.**
-  The infrastructure scripts are complete, idempotent, dry-runnable, and their
-  storage contract is tested against a DynamoDB fake that rejects items the way
-  the service does — but they have not been pointed at an account. `deploy/deploy.sh`
-  then `python deploy/verify.py --record` is the step that closes that gap, and
-  it is the one thing a reviewer should ask for first.
+- **A scan has been executed on AWS, and the receipt is committed.**
+  `deploy/verify-report.json` is `verdict: PASS` on a live account: arm64
+  (Graviton), `neural-lightglue` with the ONNX weights staged from S3, 4 typed
+  events, 8779 ms in-function / 9156 ms round trip, the ledger row read back out
+  of DynamoDB, and a session-plus-rescan through the public API with
+  `storage: s3`. What has *not* run is the container route (`deploy/deploy.sh`,
+  which needs Docker) — the zip route in `deploy/deploy.py` shipped the same
+  handler to the same architecture.
+- **The public endpoint is an API Gateway HTTP API, not a Lambda Function URL.**
+  Anonymous Function URL invocation returns 403 in the account used here even
+  with the canonical `"Principal": "*"` policy, and does so for a hello-world
+  function too. `docs/DEPLOYMENT.md` §2 records that, and what it cost to find
+  out.
 - **The benchmark is synthetic.** Real captures can be uploaded, but they have no
   answer key, so real-world accuracy is not claimed.

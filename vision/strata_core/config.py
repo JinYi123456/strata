@@ -39,6 +39,19 @@ class FeatureConfig:
     sift_edge_threshold: float = 12.0
     ratio_test: float = 0.75
 
+    def __post_init__(self) -> None:
+        # ``resolve_backend`` treats anything that is not "neural" or "classic" as
+        # "auto", so a typo arriving from an environment variable - where the only
+        # documented vocabulary in one place used to be wrong - silently selected
+        # the neural path while the operator believed they had forced SIFT. The
+        # backend a run reports is only trustworthy if an unknown name cannot be
+        # mistaken for a known one, so the vocabulary is checked where it is owned.
+        if self.backend not in ("auto", "neural", "classic"):
+            raise ValueError(
+                f"unknown feature backend {self.backend!r}; "
+                "expected 'auto', 'neural' or 'classic'"
+            )
+
 
 @dataclass(frozen=True)
 class GeometryConfig:

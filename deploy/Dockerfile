@@ -15,7 +15,18 @@ RUN dnf install -y libgomp && dnf clean all
 
 COPY vision/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
 RUN python -m pip install --no-cache-dir --upgrade pip \
- && python -m pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+ && python -m pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt \
+ && python -m pip install --no-cache-dir --no-deps --force-reinstall \
+      opencv-contrib-python-headless==5.0.0.93
+# That last line swaps the flavour, not the version. The GUI wheel that
+# requirements.txt names links libxcb and the rest of the X11 client libraries,
+# which neither this base image nor the zip-deployed runtime carries, so `import
+# cv2` dies with "libxcb.so.1: cannot open shared object file" and every
+# invocation fails before it starts. -headless is the same 5.0.0.93 build with
+# the windowing code left out - and this project never opens a window. It was
+# found by running the zip path (deploy/deploy.py), which installs headless for
+# exactly that reason; this image has not been rebuilt here because this machine
+# has no Docker, so treat this line as unverified until someone builds it.
 
 COPY vision/ ${LAMBDA_TASK_ROOT}/
 COPY deploy/handler.py ${LAMBDA_TASK_ROOT}/handler.py

@@ -2,12 +2,13 @@
 
 Every field of the submission form, filled. Paste-ready.
 
-**Status of the three things only a human account can supply:**
+**Status of the things only a human account can supply:**
 
 | Field | Blocked on |
 |---|---|
-| Video URL | YouTube upload of the committed film, `web/public/media/strata-demo.mp4` (see §6) — unlisted is fine and required for judge access |
-| Demo URL | the AWS deployment (`deploy/deploy.sh` → `deploy/verify.py`), then `NEXT_PUBLIC_API_BASE` rebuild of the Vercel console |
+| Video URL | filled — `https://youtu.be/3qVhBgztnIQ`; confirm it is **Unlisted**, not Private |
+| Demo URL | filled — the AWS API's Swagger UI (see §2); the Vercel console needs Deployment Protection off before it is worth linking |
+| Gallery images + thumbnail | your browser — Devpost's dropzone keeps one file per programmatic upload |
 | Submit | your account, and the final click |
 
 Everything else below can be pasted as it stands.
@@ -47,15 +48,19 @@ serverless
 | Technical report | `https://github.com/JinYi123456/strata/blob/master/docs/TECHNICAL_REPORT.md` | yes |
 | Review guide | `https://github.com/JinYi123456/strata/blob/master/submission/README.md` | yes |
 | Architecture diagram | `https://github.com/JinYi123456/strata/blob/master/docs/architecture.svg` | yes |
-| Demo video | *YouTube unlisted URL — to be pasted* | **no** |
-| Demo / live URL | *AWS Function URL or container URL — to be pasted* | **no** |
-| Console (static) | `https://strata-console-rouge.vercel.app` | yes, but see the note |
+| Demo video | `https://youtu.be/3qVhBgztnIQ` (4:42, must be **Unlisted**) | yes — already in the form |
+| Demo / live URL | `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs` | yes — the deployed API's own Swagger UI, no account needed |
+| Console (static) | `https://strata-console-rouge.vercel.app` | yes, but behind Vercel login — see the note |
 
-**Do not submit the Vercel URL as the live endpoint.** The console calls `/api` on
-its own origin; until it is rebuilt with `NEXT_PUBLIC_API_BASE` pointed at the AWS
-deployment it shows the interface and reports the service unreachable. Either
-finish that rebuild or leave the field to the AWS URL. A judge clicking a link
-that errors costs more than a link that is absent.
+**For the Demo URL field, use the `/api/docs` URL.** It is the deployed AWS API
+speaking to itself: the page is served by the same Lambda that runs the pipeline,
+and "Try it out" on `POST /api/sessions` really does register two frames on
+Graviton. The Vercel console is now built against that API and was verified in a
+browser, but **Vercel Deployment Protection is on for the project**, so a judge
+who clicks it lands on a Vercel login instead of the demo. Turn it off under
+Project → Settings → Deployment Protection before using the console URL in any
+public post. A judge clicking a link that demands a login costs more than a link
+that is absent.
 
 ---
 
@@ -144,26 +149,44 @@ mean, so a second look can only ever add evidence.
 
 ## AWS
 
-The vision workload targets **AWS Graviton (arm64)**: a Lambda container image
-built with `docker buildx --platform linux/arm64`, S3 for session objects,
-DynamoDB for the append-only ledger, CloudWatch for logs and per-stage metrics.
-The hybrid split is stated rather than hidden — development and the interactive
-console on x86, the vision workload on the Arm path — and the reason is technical,
-not decorative: the dominant cost is image processing (resize, warp, Sobel
-gradients, morphology, contour extraction), which is what OpenCV 5 accelerates on
-AArch64 through the KleidiCV HAL, and the workload is embarrassingly parallel
-across frame pairs.
+The vision workload runs on **AWS Graviton (arm64)**: Lambda, S3 for session
+objects and the ONNX feature weights, DynamoDB for the append-only ledger,
+CloudWatch for logs and per-stage metrics. The hybrid split is stated rather than
+hidden — development and the interactive console on x86, the vision workload on
+the Arm path — and the reason is technical, not decorative: the dominant cost is
+image processing (resize, warp, Sobel gradients, morphology, contour extraction),
+which is what OpenCV 5 accelerates on AArch64 through the KleidiCV HAL, and the
+workload is embarrassingly parallel across frame pairs.
 
-`deploy/deploy.sh` is idempotent and has a `--dry-run` that prints every command
-it would run without touching an account. `deploy/verify.py` drives one real scan
-through the deployment and writes down the receipt: architecture, image digest,
-latency measured from outside, the change set, the ledger row read back out of
-DynamoDB, and the CloudWatch tail.
+Two deployment routes are committed. `deploy/deploy.sh` builds an arm64 container
+with `docker buildx`; `deploy/deploy.py` ships the same handler to the same
+architecture as a zip resolved from PyPI's aarch64 wheels, which is the route this
+machine could actually run. Both are idempotent and have a `--dry-run` that prints
+every command without touching an account.
 
-**Honest status:** the deployment scripts have not been run against a live AWS
-account in this build, so no Arm-versus-x86 ratio is published. The harness that
-produces it is committed and the protocol is documented; publishing a number that
-was not measured would contradict the point of the project.
+**It has been run.** `deploy/verify.py --record` against a live account on
+2026-10-20, receipt committed at `deploy/verify-report.json`, verdict `PASS`:
+
+| | |
+|---|---|
+| Execution environment | `arm64` (Graviton), `python3.12`, 3008 MB |
+| Vision stack on the box | `neural-lightglue` — ALIKED + LightGlue, weights fetched from S3 into `/tmp/models` |
+| Registration | homography, confidence 0.9231, 1174 inliers of 1210 matches |
+| Change set | 4 typed events (`added`, `missing`, `state_changed`) |
+| Latency | 8779 ms inside the function, 9156 ms round trip from outside; match 4941 ms is the bulk |
+| Ledger | row read back from DynamoDB: `lambda/ledger/verify-bay-4 / 20261020-012803-…json` |
+| Public API | `POST /api/sessions` then `/rescan` over HTTPS: 4 events, `storage: s3` |
+| Live endpoint | <https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/health> |
+
+What has *not* run is the Graviton4 benchmark on EC2, so **no Arm-versus-x86 ratio
+is published**. The harness that would produce it is committed and the protocol is
+documented; publishing a number that was not measured would contradict the point of
+the project. Two findings that only a real deployment could produce are recorded in
+`docs/DEPLOYMENT.md` §2: `opencv-contrib-python` does not import on Lambda at all
+(it links `libxcb`, which the runtime has no copy of — the deployment uses the
+headless wheel at the same pinned version), and an anonymous Lambda Function URL is
+refused in this account even with the canonical public resource policy, which is why
+the endpoint sits behind API Gateway instead.
 
 ## Evaluation
 
@@ -192,7 +215,7 @@ not report.
 **Reproduced independently.** Installing `requirements.lock` in a clean
 environment and running `python scripts/evaluate.py --cases 24` reproduces the
 committed artefact **case for case, aggregate and still-pair block identical**
-(392.2 s against the recorded 387.5 s). The suite — 468 tests, 79 of which run the
+(392.2 s against the recorded 387.5 s). The suite — 481 tests, 79 of which run the
 real pipeline end to end — passes on the locked set, and CI re-runs the benchmark
 and gates it against floors on every push.
 
@@ -248,7 +271,7 @@ generated on first run and go through the same pipeline as an uploaded capture.
 pip install -r requirements.lock          # the exact measured set (Python 3.12+)
 python scripts/fetch_models.py            # ~52 MB, digest-verified
 python scripts/evaluate.py --cases 24     # regenerate every published figure
-pytest                                    # 389 fast tests
+pytest                                    # 402 fast tests
 pytest -m slow                            # 79 end-to-end tests
 bash scripts/verify_ui.sh                 # drive the live app in a real browser
 ```
@@ -260,19 +283,25 @@ bash scripts/verify_ui.sh                 # drive the live app in a real browser
 
 Eight images, all generated by `python scripts/make_submission_images.py` at the
 ratios Devpost renders (3:2 gallery, 16:9 thumbnail), each under 1 MB against the
-5 MB limit. Upload in this order; paste each caption into the image's caption
-field if the form offers one.
+5 MB limit. Upload in this order. **These are the strings actually pasted into
+Devpost's caption field, and the field is capped at 140 characters** — the longer
+prose lives in the gallery captions of `submission/README.md` instead.
 
-| # | File | Caption |
-|---|---|---|
-| 1 | `submission/thumbnail.png` | *(project thumbnail, 1280×720)* |
-| 2 | `submission/gallery/01-sites.png` | The operator console. Five sample sites are generated on first run and go through the same pipeline as an uploaded capture. Archive Row 7 is shipped as a deliberately hard case. |
-| 3 | `submission/gallery/02-scan-result.png` | A rescan in progress. The pipeline registers the second visit into the first, then normalises, differences and resolves — with per-stage timings recorded on every run. |
-| 4 | `submission/gallery/03-compare.png` | The aligned comparison. Both visits are in one canonical frame, so the slider compares one place at two moments rather than two photographs. |
-| 5 | `submission/gallery/04-changes.png` | Four typed changes: what departed, what arrived, what moved 211 px, what was altered. Each carries its measurement, its confidence and an evidence trail. The 47% one is labelled 47%. |
-| 6 | `submission/gallery/05-coverage.png` | What the system did not see. Only 30% of the frame was observed well enough to compare, so the unresolved regions become three specific capture requests instead of a confident "nothing changed". |
-| 7 | `submission/gallery/06-gate.png` | The approval gate. A scan prepares a change set and stops; nothing is written to the site's history until a person answers, and the entry records who decided. |
-| 8 | `submission/gallery/07-architecture.png` | The architecture: console, HTTP API, agent loop and the OpenCV 5 vision core, with the managed storage path on AWS Graviton and the COOL benchmark alongside it. |
+| # | File | Chars | Caption as submitted |
+|---|---|---|---|
+| 1 | `submission/thumbnail.png` | — | *(project thumbnail, 3:2; the field has no caption)* |
+| 2 | `submission/gallery/01-sites.png` | 124 | The operator console. Five sample sites are generated on first run and run through the same pipeline as an uploaded capture. |
+| 3 | `submission/gallery/02-scan-result.png` | 135 | A rescan in progress: the second visit is registered into the first, then normalised, differenced and resolved, with per-stage timings. |
+| 4 | `submission/gallery/03-compare.png` | 133 | The aligned comparison. Both visits sit in one canonical frame, so the slider compares one place at two moments, not two photographs. |
+| 5 | `submission/gallery/04-changes.png` | 135 | Four typed changes: departed, arrived, moved 211 px, altered. Each carries its measurement and confidence; the 47% one is labelled 47%. |
+| 6 | `submission/gallery/05-coverage.png` | 134 | What the system did not see. 30% of the frame was comparable, so the rest becomes three capture requests instead of "nothing changed". |
+| 7 | `submission/gallery/06-gate.png` | 136 | The approval gate. A scan stops before writing; nothing enters the site's history until a person decides, and that decision is recorded. |
+| 8 | `submission/gallery/07-architecture.png` | 133 | The architecture: console, HTTP API, agent loop and OpenCV 5 core, plus the managed AWS Graviton storage path and the COOL benchmark. |
+
+One file per Save: Devpost's gallery input is a plain `multiple` file input, but
+setting it again from automation replaces the previous choice rather than adding to
+it, so each image needs its own submit. The caption for an image only appears once
+that image exists, so each pass writes the previous image's caption.
 
 ---
 
@@ -287,12 +316,14 @@ and rendered as a readable timeline in the interface.
 
 **Best Use of COOL Award — do not enter yet.** The eligibility line is explicit:
 COOL must execute the claimed core workload on Graviton or the Arm component of a
-documented hybrid architecture. Nothing has run on Graviton in this build. The
-harness, the AMI launch script and the measurement protocol are committed, and
-`docs/DEPLOYMENT.md` §3 is the whole procedure — but entering this track without a
-measured Arm result would be a claim the repository does not support. **Enter it
-after** `run_on_graviton.sh` has produced `arm-c8g.xlarge.json` and
-`compare.py` has produced a ratio.
+documented hybrid architecture. What runs on Graviton today is the **PyPI**
+OpenCV build, not the Cloud-Optimized one — the workload is genuinely on Arm, but
+COOL itself has not executed anything. The harness, the AMI launch script and the
+measurement protocol are committed, and `docs/DEPLOYMENT.md` §3 is the whole
+procedure — but entering this track without a measured COOL-versus-baseline result
+would be a claim the repository does not support. **Enter it after**
+`run_on_graviton.sh` has produced `arm-c8g.xlarge.json` and `compare.py` has
+produced a ratio.
 
 ---
 
@@ -303,29 +334,31 @@ Requirements taken verbatim from `opencv26.devpost.com`, and where each stands.
 | Requirement | Status | Where |
 |---|---|---|
 | Uses OpenCV 5 for substantive image/video analysis | **done** | ALIKED, LightGlueMatcher, USAC_MAGSAC on 5.0.0; `vision/strata_core/` |
-| A meaningful component runs on AWS | **open** | scripts complete, never executed — `deploy/` |
+| A meaningful component runs on AWS | **done** | arm64 Lambda on Graviton ran a real scan; receipt `deploy/verify-report.json` (`PASS`), endpoint live behind API Gateway |
 | Technical report: problem, users, architecture, OpenCV 5 implementation, AWS deployment, evaluation, limitations, responsible use | **done** | `docs/TECHNICAL_REPORT.md` |
 | Public or judge-accessible code repository | **done** | github.com/JinYi123456/strata (public) |
 | Pinned dependencies | **done** | `requirements.txt` ranges + `requirements.lock` measured set |
 | Clear build, deployment and test instructions | **done** | `README.md`, `docs/DEPLOYMENT.md`, CI workflow |
 | Architecture diagram showing OpenCV 5 and AWS components, plus COOL/agent where relevant | **done** | `docs/architecture.svg` / `.png` |
-| Working web endpoint **or** arranged live screen-share | **open** | local run verified in a browser; public endpoint pending AWS |
-| Video ≤ 5 min, judge-accessible, showing **the team**, the application working, **its architecture**, and its principal results | **film done, upload pending** | 4:42 film; needs the YouTube unlisted URL |
+| Working web endpoint **or** arranged live screen-share | **done** | `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs` — the live API's own Swagger UI, openable with no account, calling the Graviton pipeline; `…/api/health` states the backend, storage and limits |
+| Video ≤ 5 min, judge-accessible, showing **the team**, the application working, **its architecture**, and its principal results | **done, visibility to confirm** | `https://youtu.be/3qVhBgztnIQ`, 4:42; must be **Unlisted**, not Private |
 | Evaluation evidence including failure cases or limitations | **done** | report §7.3, §8, `docs/evaluation.json` |
 | Entrant age / eligibility, no manipulation of judging or voting | **you** | account-level attestations |
 | Team representative designated | **you** | solo entry — you |
 | "Based on previous work" / outside-help disclosures | **you** | answer honestly; STRATA was built in this repository during the build phase |
 
-**Also worth doing before the deadline, in order of what they buy:**
+**Two open items and one loose end, in order of what they buy:**
 
-1. `./deploy/deploy.sh` then `python deploy/verify.py --record` — this is the
-   difference between meeting the AWS requirement and describing it.
-2. `COOL_AMI_ID=… ./deploy/benchmark/run_on_graviton.sh` then `compare.py` — turns
+1. `COOL_AMI_ID=… ./deploy/benchmark/run_on_graviton.sh` then `compare.py` — turns
    the COOL track from ineligible into entered, and gives the report its missing
-   number.
-3. Rebuild the Vercel console with `NEXT_PUBLIC_API_BASE` = the AWS URL, so the
-   submission has a live endpoint a judge can click.
-4. Two photographs of one shelf, ten minutes apart, with one object moved —
+   number. Everything before this line is submitted and verified.
+2. Two photographs of one shelf, ten minutes apart, with one object moved —
    uploaded through the app, and the result added to the report and the film. It
    is the only evidence that would answer "does this survive the real world",
    which is where the impact score is currently losing points.
+3. The Vercel console at `https://strata-console-rouge.vercel.app` is wired to the
+   AWS API and verified in a browser, but **Vercel Deployment Protection is on for
+   that project**, so an anonymous visitor gets a Vercel login. Switch it off
+   (Project → Settings → Deployment Protection) and the console becomes a
+   clickable demo too; until then the `/api/docs` URL above is the one to submit,
+   because it is the one that opens without an account.

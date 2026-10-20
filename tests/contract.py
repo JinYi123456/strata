@@ -1,4 +1,4 @@
-"""The deployment contract, read out of ``deploy/deploy.sh``.
+"""The deployment contract, read out of ``deploy/deploy.sh`` and ``deploy/deploy.py``.
 
 Both storage writers in this project - :class:`service.store.S3Store` for the
 HTTP service, and ``deploy/handler.py`` for the Lambda - have to write items into
@@ -9,6 +9,12 @@ table only exists in an AWS account.
 So the script is the source of truth here, and these helpers parse it. Changing
 ``deploy.sh`` without changing the code that writes to it fails the suite, which
 is the only way this contract can be checked without an account.
+
+``deploy.py`` is parsed for the same reason. It resolves wheels for a different
+machine than the one that ran the measurements, so the two dependency sets are
+allowed to differ in *flavour* - Lambda has no X11, so the package ships the
+headless OpenCV - but not in *version*, because a version drift would silently
+invalidate every number the report quotes from the local run.
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEPLOY_SH = ROOT / "deploy" / "deploy.sh"
+DEPLOY_PY = ROOT / "deploy" / "deploy.py"
 
 
 def _create_table_block() -> str:
@@ -54,3 +61,11 @@ def granted_actions(service: str) -> set[str]:
 
 def key_attributes() -> list[str]:
     return [attr for attr, _role in declared_key_schema()]
+
+
+def deployed_requirements() -> dict[str, str]:
+    """The exact pins ``deploy/deploy.py`` resolves into the Lambda package."""
+    text = DEPLOY_PY.read_text(encoding="utf-8")
+    assert "REQUIREMENTS = [" in text, "deploy.py no longer declares its dependency set"
+    block = text.split("REQUIREMENTS = [", 1)[1].split("]", 1)[0]
+    return dict(re.findall(r'"([A-Za-z0-9_.-]+)==([0-9][0-9A-Za-z.]*)"', block))

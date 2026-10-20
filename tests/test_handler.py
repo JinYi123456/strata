@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import importlib
 import json
+import platform
 import sys
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 
@@ -91,6 +93,35 @@ def test_missing_fields_return_a_typed_error(mod):
     result = mod.handler({"site_id": "bay-4"}, None)
     assert result["ok"] is False
     assert result["error"] == "bad_request"
+
+
+def test_an_empty_event_answers_with_the_health_document(mod, monkeypatch):
+    """A GET arrives as an empty event, and the endpoint has to say what it is.
+
+    Without this the deployed URL answers a browser's first request with a
+    validation error, which reads to a reviewer as a broken deployment even
+    though the scan path is fine.
+    """
+    monkeypatch.setenv("STRATA_MODEL_DIR", "")
+    doc = mod.handler({}, None)
+    assert doc["ok"] is True
+    assert doc["service"] == "strata-vision"
+    assert doc["opencv"] == str(cv2.__version__)
+    assert doc["architecture"] == platform.machine()
+    assert doc["weights_staged"] == []
+    assert doc["backend"] in {"learned", "classical"}
+    assert "POST" in doc["route"]
+
+
+def test_the_health_document_reports_the_backend_it_can_actually_use(
+        mod, monkeypatch, tmp_path):
+    """Staged weights are what makes the claim "learned" true."""
+    for name in mod.WEIGHT_FILES:
+        (tmp_path / name).write_bytes(b"")
+    monkeypatch.setenv("STRATA_MODEL_DIR", str(tmp_path))
+    doc = mod.handler({"health": True}, None)
+    assert doc["backend"] == "learned"
+    assert doc["weights_staged"] == sorted(mod.WEIGHT_FILES)
 
 
 def test_unreadable_object_returns_a_typed_error(mod, monkeypatch):

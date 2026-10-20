@@ -20,13 +20,22 @@ DynamoDB validates, by rejecting items that do not match the key schema.
 from __future__ import annotations
 
 import json
+import re
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
-from contract import declared_attribute_types, declared_key_schema, granted_actions
+from contract import (
+    declared_attribute_types,
+    declared_key_schema,
+    deployed_requirements,
+    granted_actions,
+)
 from service.store import LocalStore, S3Store, StoreError
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 # ------------------------------------------------------------- fake boto3 ---
@@ -266,3 +275,53 @@ class TestTheTwoStoresAgree:
         assert s3s.exists(key) == local.exists(key)
         assert s3s.exists("sessions/ses_1/baseline/1.png") is False
         assert local.exists("sessions/ses_1/baseline/1.png") is False
+
+
+# --------------------------------------------------- package version parity --
+
+def test_the_lambda_carries_the_headless_opencv_at_the_measured_version():
+    """Same build as the measurements, without the X11 the runtime does not have.
+
+    ``opencv-contrib-python`` resolves cleanly for ``manylinux_2_28_aarch64`` and
+    then fails at *import* on Lambda with "libxcb.so.1: cannot open shared object
+    file" - the GUI wheel links the X client libraries and the runtime ships
+    without them. That was found by deploying, not by reading, and the cost of
+    getting it wrong again is a function that answers nothing.
+
+    The flavour may differ from the local environment; the version may not, or the
+    numbers this project publishes stop describing what runs on Arm.
+    """
+    pins = deployed_requirements()
+    opencv = {name: version for name, version in pins.items()
+              if name.startswith("opencv")}
+    assert list(opencv) == ["opencv-contrib-python-headless"], (
+        f"the deployed OpenCV is {opencv}; the Lambda needs the headless wheel "
+        "and nothing else"
+    )
+    lock = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+    measured = re.search(r"^opencv-contrib-python==(\S+)$", lock, re.M)
+    assert measured, "requirements.lock no longer pins the OpenCV the project was measured on"
+    assert opencv["opencv-contrib-python-headless"] == measured.group(1), (
+        f"Lambda runs OpenCV {opencv['opencv-contrib-python-headless']} but every "
+        f"published figure came from {measured.group(1)}"
+    )
+
+
+def test_the_lambda_carries_the_measured_numpy():
+    pins = deployed_requirements()
+    lock = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+    measured = re.search(r"^numpy==(\S+)$", lock, re.M)
+    assert measured and pins.get("numpy") == measured.group(1)
+
+
+def test_the_deployed_package_ships_the_service_it_serves():
+    """The console's API is the same ``service`` package, so it has to be in the zip.
+
+    ``web_handler`` imports it, and the first deploy failed with
+    "No module named 'strata_agent'" for the same reason: the package copied the
+    vision core and nothing else, so the zip built fine and then refused to start.
+    """
+    text = (ROOT / "deploy" / "deploy.py").read_text(encoding="utf-8")
+    for needed in ('"strata_core"', '"strata_agent"', 'ROOT / "service"',
+                   'deploy" / "web_handler.py'):
+        assert needed in text, f"build_package no longer stages {needed}"

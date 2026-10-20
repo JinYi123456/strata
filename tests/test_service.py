@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import cv2
@@ -22,7 +23,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from service.app import create_app
+from service.app import create_app, pipeline_config_from_env
 from service.encoding import (
     MAX_DIMENSION,
     MAX_UPLOAD_BYTES,
@@ -33,6 +34,7 @@ from service.encoding import (
 )
 from service.sessions import SessionError, SessionManager
 from service.store import LocalStore, StoreError, validate_key
+from strata_core.config import PipelineConfig
 from strata_core.synth import make_scene
 
 # --------------------------------------------------------------------------
@@ -211,6 +213,33 @@ class TestMeta:
         assert body["vision_backend"] in {"neural-lightglue", "classic-sift", "classic-orb"}
         assert body["storage"] == "local"
         assert body["limits"]["max_frames_per_upload"] > 0
+
+    def test_the_environment_moves_the_config_the_scans_use(self, monkeypatch):
+        """STRATA_MODEL_DIR reaches the pipeline, not only the deploy adapter.
+
+        The function read it and the service did not, so one deployment ran two
+        different vision stacks: the raw scan endpoint used the neural features
+        staged in /tmp and the console used SIFT.
+        """
+        monkeypatch.setenv("STRATA_MODEL_DIR", "/tmp/models")
+        monkeypatch.setenv("STRATA_BACKEND", "classic")
+        cfg = pipeline_config_from_env()
+        assert cfg.features.model_dir == "/tmp/models"
+        assert cfg.features.backend == "classic"
+
+    def test_an_unknown_backend_is_refused_not_ignored(self, monkeypatch):
+        """"sift" is not a backend name, and pretending otherwise picked neural."""
+        monkeypatch.setenv("STRATA_BACKEND", "sift")
+        with pytest.raises(ValueError, match="unknown feature backend"):
+            pipeline_config_from_env()
+
+    def test_a_forced_backend_is_what_health_advertises(self, store):
+        """The document describes the manager that will serve the request."""
+        forced = SessionManager(store, pipeline_config=replace(
+            PipelineConfig(), features=replace(
+                PipelineConfig().features, backend="classic")))
+        body = TestClient(create_app(manager=forced)).get("/api/health").json()
+        assert body["vision_backend"] == "classic-sift"
 
     def test_sites_lists_the_demo_sites_with_thumbnails(self, client: TestClient):
         body = client.get("/api/sites").json()

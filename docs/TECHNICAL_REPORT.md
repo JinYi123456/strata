@@ -372,16 +372,30 @@ did not make.
 
 ## 6. Cloud deployment
 
-The deployment target is **AWS Graviton (arm64)** for the vision workload, with
-the console served from the same origin.
+The deployment target is **AWS Graviton (arm64)** for the vision workload. The
+console is a separate static deployment and calls the API cross-origin; the two
+are not the same origin, and the API says so in its `Access-Control-Allow-Origin`.
 
 | Component | Role |
 |---|---|
-| Lambda arm64 (container image) | Runs the vision core; the pipeline is pure and stateless, so it containerises without change |
-| S3 | Sessions, panels, artefacts |
+| Lambda arm64 (zip package; container image as an alternative) | Runs the vision core; the pipeline is pure and stateless, so it packages without change |
+| Lambda arm64 `strata-web` | The same package again with `service/app.py` under Mangum — the console's HTTP API, so the deployed UI and the local UI are one application |
+| API Gateway HTTP API | Public HTTPS endpoint in front of `strata-web`. A Lambda Function URL was tried first and is refused for anonymous callers in this account; see `docs/DEPLOYMENT.md` §2 |
+| S3 | Sessions, panels, artefacts, and the ONNX feature weights |
 | DynamoDB | Append-only site ledger |
 | CloudWatch | Logs, metrics, per-stage timings |
-| EC2 Graviton4 + COOL | Reproducible benchmark of the vision workload |
+| EC2 Graviton4 + COOL | Reproducible benchmark of the vision workload — **not run**, so no Arm-vs-x86 ratio is published |
+
+**What has actually executed there.** `deploy/verify.py --record` ran against a
+live account on 2026-10-20 and its receipt is committed at
+`deploy/verify-report.json`: `arm64`, `python3.12`, 3008 MB, backend
+`neural-lightglue` with the weights staged from S3 into `/tmp/models`,
+registration homography at confidence 0.9231 with 1174 inliers of 1210 matches,
+4 typed events, 8779 ms inside the function and 9156 ms for the round trip from
+this machine, and the ledger row read back out of DynamoDB. The public API then
+created a session and rescanned it over HTTPS: 4 events, `storage: s3`. What has
+*not* executed is the container route (no Docker on this machine) and the
+Graviton4 benchmark.
 
 **Why Arm is the right target, not a box-tick.** The dominant cost in the
 pipeline is image processing, not inference: resize, warp, adaptive threshold,
@@ -389,6 +403,10 @@ and contour extraction run on every frame pair, and they are exactly the
 operations OpenCV 5 accelerates on AArch64 through the **KleidiCV** HAL
 (NEON/SVE/SME), with additional tuning in the COOL distribution. The workload is
 also embarrassingly parallel across frames, which suits a many-core Graviton.
+The stage split measured on Graviton above is consistent with that claim without
+proving it: matching is 4941 ms of the 8779 ms, and the Arm-vs-x86 ratio that
+would actually test the COOL half is the measurement §3 of `docs/DEPLOYMENT.md`
+describes but this build has not made.
 
 **Hybrid x86/Arm, stated explicitly.** Development and the interactive console
 run on x86. The vision workload executes on the Arm path. Both are documented,
@@ -399,11 +417,15 @@ measurement protocol.
 **Observability.** The service emits structured logs with per-stage timings, and
 the agent trace is persisted with each run. A production deployment therefore
 has an answer to "why did this scan take 40 seconds" that is a measurement, not
-a guess.
+a guess — and the deployment receipt carries the CloudWatch tail alongside it, so
+the answer is not only available in principle.
 
 **Security.** No secrets in the repository. Configuration is environment-only.
 The store validates keys before use, so a session identifier cannot escape its
-prefix. Uploads are size- and type-bounded at the API boundary.
+prefix. Uploads are size- and type-bounded at the API boundary. The public
+endpoint is unauthenticated by design — it is a demonstration service over
+synthetic and operator-supplied photographs, bounded by Lambda's concurrency
+ceiling and the payload limits reported by `/api/health`, not by an origin list.
 
 ---
 

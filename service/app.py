@@ -18,6 +18,11 @@ and on managed infrastructure:
 ``STRATA_S3_BUCKET``         Bucket for frames, when ``executor=aws``
 ``STRATA_DDB_TABLE``         Table for records, when ``executor=aws``
 ``STRATA_AWS_REGION``        Region for the above
+``STRATA_BACKEND``           ``auto`` | ``neural`` | ``classic``
+``STRATA_MODEL_DIR``         Where the ONNX feature weights live. Defaults to the
+                             package-relative ``models``, which is what a Lambda
+                             zip does not have - the deploy adapter stages them
+                             into ``/tmp/models`` and sets this to match
 ``STRATA_CORS_ORIGINS``      Comma-separated allowed origins. Default ``*``
 ``STRATA_STATIC_DIR``        Built web app to serve, if any
 ===========================  ==================================================
@@ -27,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +40,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
-from strata_core.config import FeatureConfig, PipelineConfig
+from strata_core.config import PipelineConfig
 from strata_core.features import neural_available, resolve_backend
 
 from . import demo, encoding
@@ -67,6 +73,28 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def pipeline_config_from_env() -> PipelineConfig:
+    """The pipeline this environment asks for, or the library default.
+
+    ``FeatureConfig.model_dir`` is the relative ``models``, which is right for a
+    checkout and wrong for a Lambda zip: there the weights are staged into
+    ``/tmp/models`` by the deploy adapter, and nothing lands at a relative path.
+    Without this the service resolves quietly down to SIFT on AWS while the
+    technical report quotes neural-backend numbers - the function read
+    ``STRATA_MODEL_DIR`` and the service never did, so the same deployment ran two
+    different vision stacks depending on which door you came in through.
+    """
+    cfg = PipelineConfig()
+    backend = os.environ.get("STRATA_BACKEND")
+    model_dir = os.environ.get("STRATA_MODEL_DIR")
+    features = replace(
+        cfg.features,
+        backend=backend or cfg.features.backend,  # type: ignore[arg-type]
+        model_dir=model_dir or cfg.features.model_dir,
+    )
+    return replace(cfg, features=features)
+
+
 def create_app(
     *,
     executor: str | None = None,
@@ -77,6 +105,7 @@ def create_app(
     """Build the application. Injectable so tests need no environment."""
     executor = (executor or os.environ.get("STRATA_EXECUTOR", "local")).lower()
     data_dir = Path(data_dir or os.environ.get("STRATA_DATA_DIR", "data"))
+    pipeline_config = pipeline_config_from_env()
 
     if manager is None:
         store = build_store(
@@ -87,7 +116,7 @@ def create_app(
             region=os.environ.get("STRATA_AWS_REGION"),
             prefix=os.environ.get("STRATA_S3_PREFIX", "strata"),
         )
-        manager = SessionManager(store)
+        manager = SessionManager(store, pipeline_config=pipeline_config)
 
     app = FastAPI(
         title="STRATA",
@@ -155,7 +184,11 @@ def create_app(
     def health() -> Health:
         import cv2
 
-        fcfg = FeatureConfig()
+        # The manager's own config, not a fresh default: this document is the
+        # client's evidence for what the scans it is about to run will actually
+        # use, and a second FeatureConfig() would report the library default even
+        # when the deployment had pointed the models somewhere else.
+        fcfg = manager.pipeline_config.features
         backend = resolve_backend(fcfg)
         return Health(
             vision_backend=backend,

@@ -3,12 +3,18 @@
 STRATA runs in two shapes from the same code:
 
 - **Local** — one Python process serving the API and the built console on one port.
-- **AWS** — the vision workload as an arm64 Lambda container on Graviton, with S3,
-  DynamoDB and CloudWatch behind it, plus a reproducible benchmark on Graviton4
-  with the Cloud-Optimized OpenCV build.
+- **AWS** — the vision workload on Graviton (arm64) Lambda, with S3, DynamoDB and
+  CloudWatch behind it, plus a reproducible benchmark on Graviton4 with the
+  Cloud-Optimized OpenCV build. The AWS half has two packaging routes: a
+  container image (`deploy/deploy.sh`, needs Docker) and a zip built from the
+  aarch64 wheels (`deploy/deploy.py`, needs only boto3). The zip route is the one
+  that has been executed; §2 says what it cost to get there.
 
-The vision core is a pure function of its inputs, so nothing is rewritten between
-the two. The only difference is configuration.
+The vision core is a pure function of its inputs, so no vision code is rewritten
+between the two. What does differ is the environment around it — the zip has to
+carry the headless OpenCV wheel and fetch its weights at cold start, and the
+service only finds those weights if `STRATA_MODEL_DIR` reaches it — and both of
+those are deployment configuration, not a second implementation.
 
 ---
 
@@ -66,20 +72,39 @@ The static console is deployed separately at
 Next.js pipeline. That is the split §1.1 describes: the interface on a CDN, the
 vision workload on AWS.
 
-**It is not a working demo on its own, and is not offered as one.** The console
-calls `/api/...` on its own origin unless `NEXT_PUBLIC_API_BASE` is set at build
-time, so on Vercel it reaches the interface, lists nothing, and reports that the
-service is unreachable. Point it at the deployed AWS API and rebuild, and the
-same URL becomes the live endpoint. The working demonstration is the container
-above, or the film, until that rebuild happens.
+It is built with `NEXT_PUBLIC_API_BASE` set to the deployed AWS API, so the page
+and the pipeline are two different hosts and the browser calls AWS directly:
+
+```bash
+NEXT_PUBLIC_API_BASE=https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com \
+  npx vercel deploy --prod
+```
+
+Without that build-time variable the console calls `/api/...` on its own origin,
+which a static export does not serve — it reaches the interface, lists nothing,
+and reports that the service is unreachable. The variable is `NEXT_PUBLIC_API_BASE`
+(`web/lib/api.ts`); an `STRATA_API_BASE` named it in an earlier revision of this
+document, which would have sent anyone who followed it to a build that still
+talked to itself.
+
+Verified in a browser against the deployed API, not against a local server: the
+sample sites load from `https://…execute-api…/api/sites`, a rescan returns four
+typed events with their confidences, and approving the change set writes the
+history row — `Recorded · scan #0 · finalized · alignment 92% ·
+neural-lightglue`. That last part is the ledger's semantics, and it is the reason
+the gate is clicked in the check rather than assumed: an approved scan used to be
+recorded as declined.
+
+**Deployment protection is on for this project** (Vercel → Project → Settings →
+Deployment Protection, "Vercel Authentication"). An anonymous visitor is
+redirected to a Vercel login, so the URL is not yet something a judge can open.
+It is left as the one switch to flip in the dashboard rather than changed from
+here, because turning a private deployment public is not a build step.
 
 The first deploy attempt was rejected by Vercel's dependency gate: `next@15.1.6`
 pulls a `postcss` with published advisories, and the platform blocks the
 deployment rather than warning. `web/` is on `next@16.4.2` now — `npm audit`
-reports zero vulnerabilities, `tsc --noEmit` is clean, and the console was
-driven end to end in a browser on the new version: five sample sites, a real
-rescan producing four typed events, coverage guidance, the answer-key panel, and
-the approval gate recording `Recorded · scan #0 · finalized` in the history.
+reports zero vulnerabilities and `tsc --noEmit` is clean.
 
 **Give it at least 2 GB of memory.** The pipeline holds two decoded frames, a
 canonical warp and up to 2000 keypoints per side, and runs two scans
@@ -127,7 +152,7 @@ Idempotent. It creates, or reuses if present:
 | IAM role | `strata-lambda-role` | S3 + DynamoDB scoped to the two resources above |
 | Lambda function | `strata-vision` | **arm64**, container image, 3008 MB, 120 s |
 | Concurrency | reserved 5 | Bounds what one client can bill through an open Function URL |
-| Function URL | — | Public invocation endpoint |
+| Function URL | — | Public invocation endpoint. Refused for anonymous callers in the account used here — see the note below on why the public endpoint is an HTTP API |
 
 The `pk`/`sk` schema is the storage contract both writers use: `pk` is the
 parent of a record key, `sk` its leaf. `service/store.py` and
@@ -138,6 +163,55 @@ table was wrong before anything had ever been deployed.
 `./deploy/deploy.sh --dry-run` prints every command it would run and touches
 nothing, including the account lookup. It is the way to read the plan without
 credentials.
+
+### The route that has actually been executed: `deploy/deploy.py`
+
+`deploy.sh` needs Docker. This machine has none, and the deadline does not wait
+for a container runtime, so `deploy/deploy.py` ships the same code to the same
+arm64 execution environment as a **zip package**, with the dependencies resolved
+from PyPI's aarch64 wheels:
+
+| Resource | Name | Notes |
+|---|---|---|
+| Lambda function | `strata-vision` | **arm64**, zip, `handler.handler`, 3008 MB, 120 s — the raw scan endpoint |
+| Lambda function | `strata-web` | **arm64**, zip, `web_handler.handler` — `service/app.py` under Mangum, i.e. the console's own HTTP API |
+| API Gateway HTTP API | `strata-api` | `$default` route → `strata-web`, `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com` |
+| S3 / DynamoDB / role | as above | one bucket, one table, one scoped role, shared by both functions |
+| Feature weights | `models/` in the bucket | ~50 MB ONNX; staged into `/tmp/models` at cold start, because a zip carrying them unpacks past Lambda's 250 MB ceiling |
+
+Three things that only running it could teach, each now fixed in the code rather
+than worked around by hand:
+
+- **`opencv-contrib-python` does not import on Lambda.** It installs cleanly for
+  `manylinux_2_28_aarch64` and then dies at import with
+  `libxcb.so.1: cannot open shared object file`, because the GUI wheel links the
+  X11 client libraries and the runtime has none. The deployment is
+  `opencv-contrib-python-**headless**==5.0.0.93` — the same version, the same
+  algorithms, the windowing left out. `deploy/Dockerfile` carries the same swap;
+  it has not been rebuilt here, so treat that line as unverified until someone
+  with Docker builds it.
+- **An anonymous Lambda Function URL is refused in this account.** With
+  `AuthType=NONE` and the canonical `"Principal": "*"` resource policy — the one
+  the AWS documentation and the console both generate — every request comes back
+  `403 AccessDeniedException`. It does that for `strata-vision` and it did it for
+  a hello-world function created only to test the hypothesis, so it is an account
+  setting, not a deployment bug. API Gateway reaches the same code through a
+  service principal and is not covered by that refusal, which is why the public
+  endpoint is an HTTP API and not a Function URL. `verify.py` records the refusal
+  it hit rather than hiding it.
+- **The resource-policy scope has a different shape for HTTP APIs.**
+  `arn:aws:execute-api:…:<api_id>/*/*/*` — the REST-API form everyone copies —
+  gave 500s with no Lambda invocation at all; the access log said *"the IAM role
+  configured on the integration … doesn't have permissions to call the
+  integration"*. `<api_id>/*` on the same api, same account, same statement
+  returns 200. `ensure_api()` now grants the form that was measured to work.
+
+One deliberate loosening: `STRATA_CORS_ORIGINS` defaults to `*` on the deployed
+function. Hardcoding a project hostname was worse than useless — Vercel's
+production alias is a random suffix no one knows before the first deploy, so the
+console would have been CORS-blocked from its own URL. The endpoint is
+unauthenticated by design, so origins were never what bounded it; the concurrency
+ceiling and the payload limits in `/api/health` are.
 
 The container is built for `linux/arm64` with `docker buildx`, so it can be built
 from an x86 machine:
@@ -170,12 +244,14 @@ Returns the change set with per-stage timings, and writes the ledger row when
 ### Verify it, and keep the receipt
 
 `deploy/verify.py` is the step that turns "the scripts are complete" into "this
-ran on AWS". It uploads two real frames to the bucket, invokes the function over
-its URL, times the whole round trip from outside, reads the ledger row back out
-of DynamoDB, pulls the tail of the CloudWatch log, and writes all of it to a
-JSON report. It exits non-zero if the function is not arm64, if the scan
-reported no events for a scene with known changes, or if `record` was sent and
-no row appeared.
+ran on AWS". It uploads two real frames to the bucket, invokes the function,
+times the whole round trip from outside, reads the ledger row back out of
+DynamoDB, pulls the tail of the CloudWatch log, then drives the **public**
+console API end to end — `GET /api/health`, `POST /api/sessions` with a baseline
+data URL, `POST /api/sessions/<id>/rescan` — and writes all of it to a JSON
+report. It exits non-zero if the function is not arm64, if the scan reported no
+events for a scene with known changes, if `record` was sent and no row appeared,
+or if the public API did not complete a scan.
 
 ```bash
 python deploy/verify.py --region us-east-1 \
@@ -187,8 +263,26 @@ python deploy/verify.py --region us-east-1 \
   --bucket strata-sessions-<account> --frames path/to/photos --record
 ```
 
-The report is a committed artefact once it exists, and it is the first thing a
-judge should ask for.
+This has been run. `deploy/verify-report.json` is the committed receipt, verdict
+`PASS`, on account `478726716377`, region `us-east-1`, 2026-10-20:
+
+| What it proves | Measured |
+|---|---|
+| Architecture | `arm64` (Graviton), `python3.12`, Zip package, 3008 MB |
+| Which vision stack ran there | `neural-lightglue` — ALIKED + LightGlue ONNX, staged from S3 into `/tmp/models` |
+| Registration | homography, 1174 inliers of 1210 matches, confidence 0.9231 |
+| Change set | 4 events; `added`, `missing`, `state_changed` |
+| Latency, whole round trip from this machine | 9156 ms (in-function total 8779 ms) |
+| Stage split | match 4941 ms, extract 1264 + 840 ms, coverage 890 ms, diff 121 ms, register 3.9 ms |
+| Ledger | row read back from DynamoDB: `lambda/ledger/verify-bay-4` / `20261020-012803-…json` |
+| Public API | session created in 1834 ms, rescan in 11209 ms, 4 events, `storage: s3` |
+| Transport actually used | `lambda_invoke` — the Function URL returned 403, recorded in `function_url_error` |
+
+The two functions are the same code as the container, from the same package, on
+the same arm64 architecture; the difference is the packaging format, and it is
+recorded here rather than smoothed over: a container can pin the system
+libraries around OpenCV and can pre-bake the weights, a zip cannot, so the zip
+carries the headless wheel and fetches the weights at cold start.
 
 ### Why Arm
 
@@ -339,8 +433,8 @@ worse than none.
 
 **Verified in this build**
 
-- The full test suite passes on the locked dependency set: **389 fast tests and
-  79 end-to-end** (468 total), including the Lambda handler's event contract and
+- The full test suite passes on the locked dependency set: **402 fast tests and
+  79 end-to-end** (481 total), including the Lambda handler's event contract and
   its non-finite-number case, the managed-storage contract, the structured-log
   formatter and its redaction, and the documentation-vs-artefact agreement tests.
   `.github/workflows/ci.yml` runs all of it on Python 3.13 and 3.12 against the
@@ -351,25 +445,39 @@ worse than none.
   R 0.8542, F1 0.8875, 0 still-pair false positives).
 - The benchmark harness runs and produces comparable JSON on x86.
 
-**Requires an AWS account to execute — and this is the honest gap**
+**What needs an AWS account, and what has one**
 
-- `deploy/deploy.sh`, `deploy/verify.py` and
-  `deploy/benchmark/run_on_graviton.sh` are complete and idempotent, but have
-  not been run against a live account in this build. They require: ECR push,
-  Lambda create/update, S3, DynamoDB, IAM, EC2, and a Marketplace subscription
-  for the COOL AMI.
-- Consequently **no Arm-vs-x86 ratio is published here**, and nothing in this
-  repository yet demonstrates a scan that executed on AWS. The harness produces
-  both; publishing a number that was not measured would be the one thing this
-  project is built not to do.
-- What *is* verified without an account: the handler's event contract and its
-  ledger row shape, the managed store's behaviour against a fake that validates
-  the way DynamoDB does (`tests/test_store_aws.py`), and the fact that the key
-  schema and IAM actions in `deploy.sh` are the ones the code actually uses.
+Run against a live account in this build — receipt committed at
+`deploy/verify-report.json`, verdict `PASS`:
 
-To close the gap: `./deploy/deploy.sh --dry-run` to read the plan, then
-`./deploy/deploy.sh`, then `python deploy/verify.py --record` to produce
-`deploy/verify-report.json` — architecture, image digest, latency, change set,
-the ledger row read back, and the CloudWatch tail. Then §3.2 and §3.3 for the
-Arm comparison. Each step is minutes of work and cents of compute; none of it
-has been done, and the submission should be read with that in mind.
+- `deploy/deploy.py`: bucket, table, role, both arm64 zip functions, the HTTP
+  API, and a synchronous invoke that returns the function's own health document
+  before the endpoint is created.
+- `deploy/verify.py`: a real scan on Graviton, the ledger row read back out of
+  DynamoDB, the CloudWatch tail, and a session-plus-rescan through the public
+  API. §2 quotes the numbers.
+
+Not run, and not claimed:
+
+- `deploy/deploy.sh` — the container route. It needs Docker and this machine has
+  none, so the image has never been built or pushed to ECR here. The zip route
+  ships the same handler, the same pinned versions and the same arm64
+  architecture; what it does not share is the image's ability to pin system
+  libraries and pre-bake the weights.
+- `deploy/benchmark/run_on_graviton.sh` — needs an EC2 instance and the
+  Marketplace COOL AMI (§3.2).
+- Consequently **no Arm-vs-x86 ratio is published here**. The harness produces
+  both sides of it; publishing a number that was not measured would be the one
+  thing this project is built not to do.
+
+What *is* verified without an account: the handler's event contract and its
+ledger row shape, the managed store's behaviour against a fake that validates
+the way DynamoDB does (`tests/test_store_aws.py`), and the fact that the key
+schema and IAM actions in `deploy.sh` are the ones the code actually uses —
+which is how the schema bug in §2 got fixed before anything was deployed.
+
+To reproduce the executed half: `python deploy/deploy.py --dry-run` to read the
+plan, `python deploy/deploy.py` to build and deploy, then
+`python deploy/verify.py --bucket <bucket> --record` to write
+`deploy/verify-report.json`. To close the remaining gap, §3.2 and §3.3 for the
+Arm comparison.
