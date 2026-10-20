@@ -254,9 +254,60 @@ Configuration is environment-only:
 | `STRATA_S3_BUCKET` / `STRATA_DDB_TABLE` / `STRATA_AWS_REGION` | Managed storage |
 | `STRATA_CORS_ORIGINS` | Allowed origins |
 | `STRATA_STATIC_DIR` | Built console to serve |
+| `STRATA_BACKEND` | `auto` (default), `neural`, or `classic` |
+| `STRATA_MODEL_DIR` | Where the ONNX weights live — `/tmp/models` on Lambda |
 
 Switching from local disk to S3 + DynamoDB is a configuration change, not a code
 change: `service/store.py` defines one interface with two implementations.
+
+### On AWS, executed
+
+`deploy/deploy.py` ships the vision workload to **AWS Lambda on Graviton
+(arm64)** as a zip built from PyPI's aarch64 wheels — no Docker required, which is
+what makes it runnable from this machine. It creates the bucket, the ledger table,
+the scoped role, two functions and a public HTTP API, then invokes the function
+once and reads back its own health document before any endpoint exists, so a
+function that cannot import never gets a URL.
+
+```bash
+pip install boto3                          # credentials from the environment
+python deploy/deploy.py --dry-run          # what it would create, touching nothing
+python deploy/deploy.py                    # build, upload, deploy, smoke test
+python deploy/verify.py --bucket <bucket> --region us-east-1 --record
+```
+
+`deploy/verify.py` is the part that turns "the scripts are complete" into "this
+ran on AWS". Its output is committed as
+[`deploy/verify-report.json`](deploy/verify-report.json) — verdict `PASS`,
+`arm64`, `neural-lightglue` with the weights staged from S3, 4 typed events,
+8779 ms inside the function, the ledger row read back out of DynamoDB, and a
+session-plus-rescan through the public API. The live endpoint is
+<https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs>, served by the
+same code as `service/app.py`, so the deployed API and the local one are one
+application rather than a re-implementation.
+
+Two things it does not claim: `deploy/deploy.sh` (the container route) has never
+been built here, because this machine has no container runtime; and the public
+endpoint is an API Gateway HTTP API because **anonymous Lambda Function URL
+invocation is refused in the account used here** even with the canonical public
+resource policy — `docs/DEPLOYMENT.md` §2 records that, and the other findings
+that only a real deployment produces.
+
+### The console on Vercel
+
+`web/` exports statically and is deployed to
+<https://strata-console-rouge.vercel.app>, built with
+`NEXT_PUBLIC_API_BASE` pointed at the AWS API above, so the browser calls AWS
+directly. Verified in a real browser against the deployed API: the site list
+loads from `…/api/sites`, a rescan returns four typed events, and approving the
+change set writes the history row.
+
+It is not yet a link to hand a judge: **Vercel Deployment Protection is on for
+the project**, so an anonymous visitor is redirected to a Vercel login, and the
+project's root directory is unset, so git-triggered builds fail while the
+manually deployed one stays live. Both are one-line settings in the Vercel
+dashboard, and neither is required by the competition — the submitted
+"working web endpoint" is the AWS API, which needs no account.
 
 ### Repository layout
 
@@ -310,3 +361,27 @@ where it stops working:
 - **Synthetic evaluation data.** The benchmark scenes are generated with known
   answers, so they are the only place a ground-truth comparison is possible. Real
   captures can be uploaded through the app, but they have no answer key.
+
+---
+
+## Licence
+
+No licence is granted. The repository is public so that judges and organisers can
+read and run it; that is all. Legally that means **all rights reserved** by the
+author, which is also what the competition expects rather than forbids — its own
+submission requirements say "the code does not have to be open source", and the
+rules state that participants
+"retain all right, title, and interest in their entries and underlying
+intellectual property, including source code, models, model weights, datasets,
+inventions, methods, documentation, images, and know-how, subject to any
+third-party licenses they use". The only licence the rules ask for is the
+non-exclusive right for OpenCV and AWS to promote the submitted materials, and
+that is granted by submitting.
+
+Third-party terms this project stands on, all of them permissive and none of them
+copyleft: OpenCV 5 (Apache-2.0), NumPy (BSD), FastAPI and Starlette (MIT),
+Pydantic (MIT), Next.js and React (MIT), Tailwind CSS (MIT). The ALIKED and
+LightGlue ONNX weights are not vendored: `scripts/fetch_models.py` pulls them
+from `bukuroo/ALIKED-LightGlue-ONNX` on Hugging Face, which declares Apache-2.0,
+and refuses the file unless its SHA-256 matches the digest recorded in the script.
+`requirements.lock` records the exact versions everything was measured on.

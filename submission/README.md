@@ -6,6 +6,17 @@ Where everything lives, and what to look at first.
 → <http://127.0.0.1:8000>. No configuration, no API keys, no model download
 required to start; the five sample sites are generated on first run.
 
+**Or click it live, with nothing installed** —
+<https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs> is the deployed
+API's own Swagger UI, served by the Lambda that runs the pipeline on AWS Graviton:
+`POST /api/sessions` then `/rescan` really registers two frames and returns the
+typed change set. `…/api/health` answers with the OpenCV version, the resolved
+backend (`neural-lightglue`), the storage backend (`s3`) and the enforced limits.
+The browser console is deployed at <https://strata-console-rouge.vercel.app> and
+was verified against that API, but **Vercel Deployment Protection is still on for
+that project**, so an anonymous visitor gets a Vercel login — use the API URL
+above, or the local run, until that setting is changed.
+
 **Film (4:50, under the five-minute cap)** —
 [strata-demo.mp4](../web/public/media/strata-demo.mp4) · also served at
 `/media/strata-demo.mp4` when the app is running. It opens on authorship, runs
@@ -43,12 +54,14 @@ the one input no script can regenerate, so it is committed too.
 | **Source code** | This repository |
 | **Pinned dependencies** | `requirements.txt` (ranges) · `requirements.lock` (the measured set) |
 | **Build / deploy / test instructions** | [`README.md`](../README.md) · [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) |
-| **Demo video (≤5 min)** | [`service/static/media/strata-demo.mp4`](../service/static/media/strata-demo.mp4) |
+| **Demo video (≤5 min)** | [`web/public/media/strata-demo.mp4`](../web/public/media/strata-demo.mp4) · published at <https://youtu.be/iJZIpOdfq6Y> |
 | **Evaluation evidence** | [`docs/TECHNICAL_REPORT.md`](../docs/TECHNICAL_REPORT.md) §7 · [`docs/evaluation.json`](../docs/evaluation.json) (the raw run) · `scripts/evaluate.py` (regenerate) |
 | **Failure cases and limitations** | Technical report §7.3 and §8 |
 | **Responsible-use considerations** | [`docs/RESPONSIBLE_USE.md`](../docs/RESPONSIBLE_USE.md) |
 | **Agent workflow and trace** | Technical report §5 · the trace panel in the app · `vision/strata_agent/` |
 | **Cloud deployment** | [`deploy/`](../deploy) · [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) |
+| **Deployment evidence** | [`deploy/verify-report.json`](../deploy/verify-report.json) — verdict `PASS` from a live account: arm64, `neural-lightglue`, 4 events, ledger row read back, plus a session-and-rescan through the public API |
+| **Live endpoint** | <https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs> (no account needed) |
 | **Benchmark harness** | [`deploy/benchmark/`](../deploy/benchmark) · results in `deploy/benchmark/results/` |
 | **UI states** | [`docs/screenshots/`](../docs/screenshots) |
 
