@@ -6,7 +6,7 @@ Every field of the submission form, filled. Paste-ready.
 
 | Field | Blocked on |
 |---|---|
-| Video URL | filled — `https://youtu.be/3qVhBgztnIQ`; confirm it is **Unlisted**, not Private |
+| Video URL | filled — `https://youtu.be/iJZIpOdfq6Y` (4:50, verified reachable without a login) |
 | Demo URL | filled — the AWS API's Swagger UI (see §2); the Vercel console needs Deployment Protection off before it is worth linking |
 | Gallery images + thumbnail | your browser — Devpost's dropzone keeps one file per programmatic upload |
 | Submit | your account, and the final click |
@@ -48,7 +48,7 @@ serverless
 | Technical report | `https://github.com/JinYi123456/strata/blob/master/docs/TECHNICAL_REPORT.md` | yes |
 | Review guide | `https://github.com/JinYi123456/strata/blob/master/submission/README.md` | yes |
 | Architecture diagram | `https://github.com/JinYi123456/strata/blob/master/docs/architecture.svg` | yes |
-| Demo video | `https://youtu.be/3qVhBgztnIQ` (4:42, must be **Unlisted**) | yes — already in the form |
+| Demo video | `https://youtu.be/iJZIpOdfq6Y` (4:50) | yes — the project page embeds this one |
 | Demo / live URL | `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs` | yes — the deployed API's own Swagger UI, no account needed |
 | Console (static) | `https://strata-console-rouge.vercel.app` | yes, but behind Vercel login — see the note |
 
@@ -416,7 +416,7 @@ Requirements taken verbatim from `opencv26.devpost.com`, and where each stands.
 | Clear build, deployment and test instructions | **done** | `README.md`, `docs/DEPLOYMENT.md`, CI workflow |
 | Architecture diagram showing OpenCV 5 and AWS components, plus COOL/agent where relevant | **done** | `docs/architecture.svg` / `.png` |
 | Working web endpoint **or** arranged live screen-share | **done** | `https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs` — the live API's own Swagger UI, openable with no account, calling the Graviton pipeline; `…/api/health` states the backend, storage and limits |
-| Video ≤ 5 min, judge-accessible, showing **the team**, the application working, **its architecture**, and its principal results | **done, visibility to confirm** | `https://youtu.be/3qVhBgztnIQ`, 4:42; must be **Unlisted**, not Private |
+| Video ≤ 5 min, judge-accessible, showing **the team**, the application working, **its architecture**, and its principal results | **done** | `https://youtu.be/iJZIpOdfq6Y`, 4:50 of the 5:00 cap; `isPrivate: false` and `playabilityStatus: OK` checked from outside the account |
 | Evaluation evidence including failure cases or limitations | **done** | report §7.3, §8, `docs/evaluation.json` |
 | Entrant age / eligibility, no manipulation of judging or voting | **you** | account-level attestations |
 | Team representative designated | **you** | solo entry — you |
