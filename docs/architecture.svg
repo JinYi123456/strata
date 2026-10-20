@@ -110,5 +110,5 @@
   <text x="1092" y="685" font-size="12.5" font-weight="600" text-anchor="middle" fill="#1F2421">EC2 Graviton4 · COOL</text>
   <text x="1092" y="704" font-size="11" text-anchor="middle" fill="#5F5E5A">reproducible benchmark</text>
 
-  <text x="40" y="766" font-size="11" fill="#8A8F87">The vision core is a pure function of its inputs: the same code runs in the console, in the service and in the Arm container.</text>
+  <text x="40" y="766" font-size="11" fill="#8A8F87">The vision core is a pure function of its inputs: the same code runs in the console, in the HTTP service and in an arm64 Lambda on AWS.</text>
 </svg>

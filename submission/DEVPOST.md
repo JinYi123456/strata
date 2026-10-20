@@ -234,7 +234,9 @@ and gates it against floors on every push.
   model-comparison note was recorded. The fundamental-matrix branch is real and is
   covered by tests that turn it on; the benchmark contains no scene with enough
   depth structure to need it.
-- **No Arm-versus-x86 measurement**, and no scan yet demonstrated on AWS.
+- **No Arm-versus-x86 measurement.** The workload genuinely runs on Arm today - the
+  receipt above is from a Graviton function - but the COOL benchmark on a Graviton4
+  EC2 instance has not been run, so no speed-up ratio is published.
 - **The evaluation data is synthetic.** Real captures can be uploaded and go
   through the same code path, but they carry no answer key, so no real-world
   accuracy is claimed.
@@ -276,6 +278,79 @@ pytest -m slow                            # 79 end-to-end tests
 bash scripts/verify_ui.sh                 # drive the live app in a real browser
 ```
 ```
+
+---
+
+## 3b. The hackathon's own fields
+
+These are the submission form's questions, separate from the project description.
+They had been typed straight into the browser, so they drifted from the repository -
+the field below still said "468 tests, 389 fast" and "Python 3.11+" long after both
+were corrected. This section is their home now; paste it verbatim.
+
+**Repository URL**
+
+```
+https://github.com/JinYi123456/strata
+```
+
+**Working web endpoint**
+
+```
+https://c3rdzrdswf.execute-api.us-east-1.amazonaws.com/api/docs
+```
+
+The API's own Swagger UI, served by the deployed Lambda: no account, no login, and
+"Try it out" against `POST /api/sessions` really runs the pipeline on Graviton.
+`…/api/health` answers with the OpenCV version, the resolved backend, the storage
+backend and the enforced limits, so the endpoint documents what it is running.
+
+**Testing instructions**
+
+```
+git clone https://github.com/JinYi123456/strata.git && cd strata
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt                        # the ranges; the lock needs 3.12+
+python scripts/serve.py                                # -> http://127.0.0.1:8000
+
+No configuration, no API keys and no model download are needed to start: five
+sample sites are generated on first run and go through the same pipeline as an
+uploaded capture. Pick "Loading Bay 4", press "Run rescan", and the pipeline
+registers the second visit into the first and returns four typed changes - one of
+them at 47% confidence, which the interface says so.
+
+TESTS (481 tests: 402 fast + 79 end-to-end; the end-to-end run is 78 pass plus 1
+conditional skip, about 37 minutes on a laptop)
+  pip install -r requirements-dev.txt
+  pytest                 # ~2 min, the pure-logic half
+  pytest -m slow         # the real pipeline, end to end
+  bash scripts/verify_ui.sh   # drives the live app in Chromium
+
+REPRODUCE EVERY PUBLISHED NUMBER
+  pip install -r requirements.lock    # the exact measured set, Python 3.13.12
+  python scripts/fetch_models.py      # ~52 MB ONNX, digest-verified
+  python scripts/evaluate.py --cases 24
+  python scripts/gate.py              # fails if a metric falls below its floor
+Every figure in the report is regenerated from docs/evaluation.json by
+scripts/figures.py, and tests/test_docs_agree_with_artifact.py fails if a document
+stops matching the run.
+
+RUN IT ON AWS - this has been done; the receipt is committed
+  pip install boto3
+  python deploy/deploy.py --dry-run   # what it would create, touching nothing
+  python deploy/deploy.py             # arm64 zip functions + the HTTP API
+  python deploy/verify.py --bucket <bucket> --region us-east-1 --record
+deploy/verify-report.json is the PASS receipt: arm64 (Graviton), neural-lightglue
+with the weights staged from S3, 4 typed events, 8779 ms inside the function, the
+ledger row read back out of DynamoDB, and a session-plus-rescan through the public
+API. None of it is needed to run the project: the same code runs locally with zero
+configuration, which is the point of the storage and backend abstractions.
+```
+
+**Sponsor / special prizes** — `Agentic Vision Award` only. Best Use of COOL is
+deliberately not entered: the workload runs on Arm, but not on the COOL build, and
+the track's eligibility line requires the claimed core workload to execute under
+COOL with a measured baseline comparison. See §5.
 
 ---
 

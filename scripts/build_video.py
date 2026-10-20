@@ -303,7 +303,7 @@ def limitations_card(out: Path, metrics: dict) -> Path:
         (f"{metrics['merged_cases']} of {metrics['cases']} cases merge two changes into one region",
          "documented, and pinned by a test"),
         ("No Arm-versus-x86 ratio is published",
-         "because no Graviton instance was available to measure one"),
+         "the COOL benchmark on an EC2 Graviton4 instance has not been run"),
         ("The evaluation data is synthetic",
          "real captures work, but they carry no answer key"),
     ]
@@ -430,6 +430,11 @@ def transcode_existing(src: Path, dst: Path) -> Path:
     wants = {f"width={W}", f"height={H}", "codec_name=h264", "pix_fmt=yuv420p"}
     have = set(probe.split())
     if wants <= have:
+        # Re-recording the film reads the previous segment back as its own input,
+        # in which case src and dst are the same file and copying onto itself is
+        # an error rather than a no-op.
+        if src.resolve() == dst.resolve():
+            return dst
         shutil.copyfile(src, dst)
         return dst
     subprocess.run(
@@ -480,8 +485,9 @@ def plan(metrics: dict) -> list[Segment]:
             "And the vision core, on OpenCV five: A.L.I.K.E.D. features, LightGlue matching, "
             "and registration by U.S.A.C. Magsac. "
             "The core is a pure function of its inputs. That is what lets the identical code "
-            "run in the console, in the service, and in an arm-sixty-four container on "
-            "AWS Graviton, without a conditional anywhere.",
+            "run in the console, in the service, and in an arm-sixty-four function on "
+            "AWS Graviton, without a conditional anywhere - and that deployment has been "
+            "run: a scan takes about nine seconds there, and writes its own ledger row.",
         ),
         Segment(
             "05-results",
@@ -500,9 +506,9 @@ def plan(metrics: dict) -> list[Segment]:
             f"are found, and both numbers are published rather than blended. "
             f"{metrics['merged_cases']} of the twenty-four cases merge two changes into one "
             f"region. "
-            f"No Arm-versus-x86 speed-up is claimed, because no Graviton instance was "
-            f"available to measure one, even though the harness that would produce it is "
-            f"committed and reproducible.",
+            f"No Arm-versus-x86 speed-up is claimed, because the benchmark has never been "
+            f"run on a Graviton four instance with the cloud-optimized OpenCV build, even "
+            f"though the harness that would produce it is committed and reproducible.",
         ),
     ]
 
@@ -523,8 +529,8 @@ def build(build_dir: Path, demo: Path, metrics_path: Path) -> Path:
          "OpenCV 5 · ALIKED + LightGlue · USAC/MAGSAC · pure functions"),
         ("Storage sits behind one interface: local disk, or S3 plus DynamoDB.",
          "switching is a configuration change, not a code change"),
-        ("The vision workload runs on AWS Graviton, in an arm64 Lambda container.",
-         "hybrid by design: x86 for the console, Arm for the vision"),
+        ("Hybrid by design: the console on x86, the vision workload on Arm.",
+         "an arm64 Lambda on AWS Graviton - 8.8 s a scan, four events, ledger row written"),
     ]
     arch_frames = []
     for index, (caption, highlight) in enumerate(arch_captions, start=1):

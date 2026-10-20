@@ -269,7 +269,7 @@ service/             the HTTP API, session lifecycle, and the bundled console
 web/                 the console source (TypeScript, Next.js, Tailwind)
 scripts/             evaluation, figures and gates, model fetch, serving, console build, verification
 tests/               481 tests: 402 fast, 79 end-to-end behind `-m slow`
-deploy/              arm64 Lambda container, deploy + teardown + verify, COOL benchmark
+deploy/              two arm64 Lambda routes (zip via deploy.py, container via deploy.sh) + teardown + verify, COOL benchmark
 docs/                technical report, architecture, deployment, responsible use
 submission/          review guide: where everything lives
 Dockerfile           portable image for any container host

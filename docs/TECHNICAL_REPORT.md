@@ -94,7 +94,7 @@ Four layers, each with one responsibility:
 
 The purity of the vision core is a deliberate architectural constraint, not a
 style preference. It is what lets the identical code run in the console process,
-in the HTTP service, and inside an Arm container on AWS without a conditional
+in the HTTP service, and in an arm64 Lambda on AWS without a conditional
 anywhere. It also makes the pipeline testable without fixtures on disk.
 
 Storage is behind one interface (`Store`) with two implementations: local disk
